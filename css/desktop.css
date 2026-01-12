@@ -1,0 +1,182 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(120deg, #0f4c81 0%, #1e90ff 50%, #5fb0ff 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: #eef7ff;
+    overflow: hidden;
+}
+
+#desktop {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#desktop-area {
+    flex: 1;
+    padding: 20px;
+    position: relative;
+    overflow: auto;
+}
+
+.desktop-icon {
+    width: 80px;
+    margin: 20px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+    vertical-align: top;
+    transition: transform 0.2s ease;
+}
+
+.desktop-icon:hover {
+    transform: scale(1.05);
+}
+
+.desktop-icon-label {
+    color: #e6f3ff;
+    font-size: 13px;
+    word-wrap: break-word;
+    margin-top: 8px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+    font-weight: 600;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+#game-hud {
+    animation: fadeIn 0.4s ease;
+}
+
+
+/* Animations pour les fenêtres */
+
+/* Animation d'ouverture depuis la barre des tâches */
+@keyframes windowOpenFromTaskbar {
+    from {
+        opacity: 0;
+        transform: translateY(400px) scale(0.3);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Animation de réduction vers la barre des tâches */
+@keyframes windowMinimize {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(400px) scale(0.3);
+    }
+}
+
+/* Animation de fermeture qui se réduit sur elle-même */
+@keyframes windowClose {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0);
+    }
+}
+
+/* Classes pour appliquer les animations */
+.window-opening {
+    animation: windowOpenFromTaskbar 0.1s ease-out forwards;
+}
+
+.window-minimizing {
+    animation: windowMinimize 0.1s ease-in forwards;
+}
+
+.window-closing {
+    animation: windowClose 0.1s ease-in forwards;
+}
+
+/* Styles pour la taskbar */
+#taskbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: rgba(30, 30, 40, 0.8);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    z-index: 9999;
+    padding: 0 20px;
+}
+
+.taskbar-button {
+    font-size: 28px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    padding: 8px;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    background: transparent;
+    color: #eef7ff;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.taskbar-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.taskbar-button.taskbar-active {
+    background: rgba(120, 150, 180, 0.35);
+    border-color: rgba(120, 150, 180, 0.6);
+    box-shadow: inset 0 0 10px rgba(100, 150, 200, 0.3);
+    transform: scale(1.08);
+}
+
+.taskbar-button.taskbar-inactive {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    transform: scale(1);
+}
