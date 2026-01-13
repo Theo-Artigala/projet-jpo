@@ -1,0 +1,41 @@
+{
+	"profiles": [
+		{
+			"id": "jean_dupont",
+			"name": "Jean Dupont",
+			"email": "jean.dupont2024@mail.com",
+			"bio": "J'aime les chats et la musique rock"
+		}
+	],
+	"mailbox": {
+		"inbox": [
+			{ "id": "m1", "from": "alice@mail.com", "to": "jean.dupont2024@mail.com", "subject": "Réunion projet urgente", "body": "Salut Jean, peux-tu venir à la réunion demain à 14h ? On doit discuter du deadline pour le module authentification.", "date": "2024-03-10" },
+			{ "id": "m2", "from": "boss@entreprise.fr", "to": "jean.dupont2024@mail.com", "subject": "Rapport mensuel requis", "body": "Jean, peux-tu envoyer ton rapport de travail avant vendredi ? Il faut détailler les tâches complétées et les heures...", "date": "2024-03-09" },
+			{ "id": "m3", "from": "newsletter@amazon-deals.com", "to": "jean.dupont2024@mail.com", "subject": "⚡ SUPER OFFRE LIMITÉE - 70% OFF", "body": "Jean ! Découvrez nos offres incroyables sur les gadgets tech. Plus de 5000 produits à prix cassés ! Cliquez maintenant !", "date": "2024-03-08" },
+			{ "id": "m4", "from": "support@freegame.io", "to": "jean.dupont2024@mail.com", "subject": "Vous avez gagné un prix gratuit !", "body": "Félicitations ! Vous avez été sélectionné pour recevoir une carte cadeau de 500€ ! Confirmez votre identité en cliquant ici...", "date": "2024-03-07" },
+			{ "id": "m5", "from": "collegue@mail.com", "to": "jean.dupont2024@mail.com", "subject": "Code review - PR #234", "body": "J'ai reviewé ton PR. Quelques commentaires sur la gestion des erreurs, peux-tu jeter un coup d'oeil ?", "date": "2024-03-06" }
+		],
+		"sent": [
+			{ "id": "s1", "from": "jean.dupont2024@mail.com", "to": "alice@mail.com", "subject": "Re: Réunion projet urgente", "body": "D'accord, je serai là à 14h. À bientôt !", "date": "2024-03-10" },
+			{ "id": "s2", "from": "jean.dupont2024@mail.com", "to": "boss@entreprise.fr", "subject": "Rapport mensuel - Mars 2024", "body": "Voici mon rapport de travail. J'ai complété 8 tâches principales avec un total de 42 heures travaillées.", "date": "2024-03-05" }
+		],
+		"spam": [
+			{ "id": "sp1", "from": "scam@fake.com", "to": "jean.dupont2024@mail.com", "subject": "Votre compte bancaire a été compromis !", "body": "URGENT: Votre compte a été piraté. Cliquez ici pour vérifier votre identité immédiatement ou votre compte sera fermé !", "date": "2024-03-01" },
+			{ "id": "sp2", "from": "noreply@clickbait.com", "to": "jean.dupont2024@mail.com", "subject": "Les stars DÉTESTENT cette astuce pour perdre du poids", "body": "Découvrez le secret que les célébrités cachent... Un simple truc va changer votre vie !", "date": "2024-02-28" },
+			{ "id": "sp3", "from": "winner@casino-online.net", "to": "jean.dupont2024@mail.com", "subject": "JE VOUS AI CHOISI - Vous avez GAGNÉ 100 000€", "body": "Félicitations !!!  Vous faites partie des 10 gagnants du mois ! Cliquez pour réclamer votre prix !", "date": "2024-02-25" }
+		]
+	},
+	"filesystem": {
+		"Desktop": {
+			"README.txt": "Bienvenue! Clue: Mon mot de passe contient ma passion...",
+			"notes.txt": "J'aime les chats et la musique"
+		},
+		"Documents": {
+			"passwords.csv": "email,password\njean.dupont2024@mail.com,MonChat2024!\n",
+			"important.txt": "Mail: jean.dupont2024@mail.com"
+		},
+		"Downloads": {
+			"wordlist.txt": "password\n123456\nletmein\nMonChat2024!\nadmin\n"
+		}
+	}
+}
