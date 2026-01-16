@@ -1,0 +1,2553 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OSINT-OS v5.0 — Scenario Edition (Intuitif, Aides Subtiles)</title>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Dynamic favicon -->
+    <link id="dyn-favicon" rel="icon" href="" />
+
+    <style>
+      /* --- 0. CRT & FX --- */
+      .crt-overlay {
+        position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        background-size: 100% 2px, 3px 100%;
+        animation: flicker 0.15s infinite;
+        opacity: 0.4;
+      }
+      @keyframes flicker { 0% { opacity: 0.38; } 50% { opacity: 0.42; } 100% { opacity: 0.38; } }
+
+      /* Cursor Hack */
+      .cursor-hack { cursor: crosshair !important; }
+      .clickable:hover { cursor: pointer; filter: brightness(1.2); transform: scale(1.02); }
+      .fl-clickable:hover { background-color: #f2f2f2 !important; cursor: pointer; }
+
+      /* Crop Box (Pixel Hunting) */
+      #crop-box {
+        position: absolute; border: 2px dashed #0f0; background: rgba(0, 255, 0, 0.1);
+        display: none; pointer-events: none; z-index: 20;
+      }
+
+      :root {
+        --bg-wallpaper: url("https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop");
+        --color-dark: #0f172a;
+        --color-dark-glass: rgba(15, 23, 42, 0.9);
+        --color-light: #f8fafc;
+        --color-accent: #3b82f6;
+        --color-accent-dim: rgba(59, 130, 246, 0.2);
+        --color-danger: #ef4444;
+        --color-warning: #f59e0b;
+        --color-success: #10b981;
+        --color-border: rgba(255, 255, 255, 0.1);
+
+        --radius-win: 10px;
+        --shadow-win: 0 20px 50px -10px rgba(0, 0, 0, 0.8);
+        --blur-glass: blur(18px);
+        --header-height: 34px;
+      }
+
+      * {
+        box-sizing: border-box;
+        user-select: none;
+        outline: none;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        overflow: hidden;
+        background: #000;
+        font-family: Inter, sans-serif;
+        color: var(--color-light);
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+      .flex-center {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .full-size {
+        width: 100%;
+        height: 100%;
+      }
+      .font-mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+      .text-dim {
+        opacity: 0.6;
+      }
+
+      /* BOOT */
+      #boot-layer {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 9999;
+        padding: 40px;
+        font-family: "Share Tech Mono", monospace;
+        color: var(--color-success);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        font-size: 16px;
+        text-shadow: 0 0 5px var(--color-success);
+      }
+      .boot-line {
+        margin-bottom: 6px;
+        opacity: 0;
+        animation: fadeIn 0.1s forwards;
+        border-left: 2px solid transparent;
+        padding-left: 10px;
+      }
+      @keyframes fadeIn {
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* LOGIN */
+      #login-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 5000;
+        background:
+          linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+          var(--bg-wallpaper) center/cover;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(15px);
+      }
+      .login-box {
+        background: rgba(20, 20, 20, 0.7);
+        padding: 40px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        width: 360px;
+        text-align: center;
+        box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
+        transform: translateY(30px);
+        opacity: 0;
+        animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards 0.2s;
+      }
+      @keyframes slideUp {
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .avatar {
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        margin: 0 auto 25px;
+        background: url("https://ui-avatars.com/api/?name=Julien+Dupuis&background=0D8ABC&color=fff&size=128")
+          center/cover;
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+      }
+      .btn-recovery {
+        font-size: 13px;
+        color: #94a3b8;
+        text-decoration: none;
+        border-bottom: 1px dashed #94a3b8;
+        cursor: pointer;
+        margin-top: 20px;
+        display: inline-block;
+        padding-bottom: 2px;
+        transition: 0.2s;
+      }
+      .btn-recovery:hover {
+        color: white;
+        border-color: white;
+      }
+      .btn-hard {
+        margin-top: 12px;
+        font-size: 13px;
+        color: #fbbf24;
+        text-decoration: none;
+        border-bottom: 1px dashed rgba(251, 191, 36, 0.8);
+        cursor: pointer;
+        display: inline-block;
+        padding-bottom: 2px;
+        transition: 0.2s;
+      }
+      .btn-hard:hover {
+        color: #fff;
+        border-color: #fff;
+      }
+
+      /* DESKTOP */
+      #desktop {
+        position: fixed;
+        inset: 0;
+        background: var(--bg-wallpaper) center/cover;
+        z-index: 1;
+        overflow: hidden;
+      }
+
+      #status-bar {
+        height: var(--header-height);
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 25px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #e2e8f0;
+      }
+      .sb-group {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+
+      #icon-grid {
+        position: absolute;
+        top: 50px;
+        left: 20px;
+        bottom: 100px;
+        width: 360px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        flex-wrap: wrap;
+        align-content: flex-start;
+      }
+      .desktop-icon {
+        width: 90px;
+        padding: 10px 5px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: 0.2s;
+        text-align: center;
+      }
+      .desktop-icon:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(4px);
+      }
+      .di-img {
+        font-size: 38px;
+      }
+      .di-label {
+        font-size: 12px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+        font-weight: 500;
+        color: #fff;
+      }
+
+      #dock-container {
+        position: absolute;
+        bottom: 20px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        z-index: 1000;
+      }
+      #dock {
+        background: rgba(20, 20, 20, 0.4);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 12px;
+        border-radius: 24px;
+        display: flex;
+        gap: 12px;
+      }
+      .dock-app {
+        width: 55px;
+        height: 55px;
+        border-radius: 14px;
+        font-size: 32px;
+        background: rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.25s;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .dock-app:hover {
+        transform: translateY(-12px) scale(1.12);
+        background: rgba(255, 255, 255, 0.15);
+      }
+      .dock-app.running::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        width: 5px;
+        height: 5px;
+        background: var(--color-accent);
+        border-radius: 50%;
+      }
+
+      #mission-hud {
+        position: absolute;
+        top: 50px;
+        right: 20px;
+        width: 400px;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        padding: 20px;
+        z-index: 50;
+        transform: translateX(120%);
+        transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        backdrop-filter: blur(15px);
+      }
+      #mission-hud.active {
+        transform: translateX(0);
+      }
+      .hud-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 10px;
+      }
+      .hud-title {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--color-accent);
+        font-weight: 800;
+      }
+      #mission-brief {
+        font-size: 12px;
+        color: #cbd5e1;
+        line-height: 1.55;
+        margin: 12px 0 14px;
+        opacity: 0.95;
+      }
+      .mission-item {
+        font-size: 13px;
+        margin-bottom: 12px;
+        display: flex;
+        gap: 12px;
+        color: rgba(255, 255, 255, 0.55);
+        align-items: flex-start;
+        line-height: 1.4;
+      }
+      .mission-item.current {
+        color: white;
+        font-weight: 700;
+      }
+      .mission-item.done {
+        color: var(--color-success);
+        opacity: 1;
+        font-weight: 600;
+      }
+      .mission-check {
+        min-width: 12px;
+        margin-top: 2px;
+        font-size: 10px;
+      }
+
+      #toast-area {
+        position: fixed;
+        top: 70px;
+        right: 430px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+      }
+      .toast {
+        pointer-events: auto;
+        background: rgba(20, 20, 20, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-left: 4px solid var(--color-accent);
+        padding: 16px;
+        border-radius: 6px;
+        width: 360px;
+        color: white;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+        animation: slideInRight 0.35s ease-out;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      /* WINDOWS */
+      .window {
+        position: absolute;
+        background: var(--color-dark-glass);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-win);
+        box-shadow: var(--shadow-win);
+        backdrop-filter: var(--blur-glass);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        opacity: 0;
+        transform: scale(0.92);
+        transition:
+          width 0s, height 0s, /* No transition on resize */
+          opacity 0.2s,
+          transform 0.2s;
+        resize: both; /* Resizable windows */
+        min-width: 400px; min-height: 300px;
+      }
+      .window.open {
+        opacity: 1;
+        transform: scale(1);
+      }
+      .window.minimized {
+        opacity: 0; transform: scale(0.1) translateY(400px); pointer-events: none; transition: 0.4s cubic-bezier(0.1, 0.8, 0.2, 1);
+      }
+
+      .win-header {
+        height: 42px;
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        cursor: default;
+      }
+      .win-controls {
+        display: flex;
+        gap: 8px;
+        margin-right: 20px;
+      }
+      .wc-btn {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+      .wc-close {
+        background: #ef4444;
+      }
+      .wc-min {
+        background: #f59e0b;
+      }
+      .wc-max {
+        background: #10b981;
+      }
+      .win-title {
+        flex: 1;
+        text-align: center;
+        font-size: 13px;
+        opacity: 0.7;
+        pointer-events: none;
+        font-weight: 500;
+      }
+      .win-content {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.3);
+      }
+
+      /* MAIL */
+      .app-mail {
+        display: flex;
+        height: 100%;
+        background: #fff;
+        color: #1e293b;
+        font-family: "Segoe UI", sans-serif;
+      }
+      .m-sb {
+        width: 220px;
+        background: #f1f5f9;
+        padding: 10px;
+        border-right: 1px solid #cbd5e1;
+      }
+      .m-folder {
+        padding: 8px 12px;
+        font-size: 13px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #64748b;
+        margin-bottom: 2px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .m-folder:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      .m-folder.active {
+        background: #dbeafe;
+        color: #2563eb;
+        font-weight: 700;
+      }
+      .m-list {
+        width: 360px;
+        border-right: 1px solid #cbd5e1;
+        overflow-y: auto;
+        background: white;
+      }
+      .m-item {
+        padding: 15px;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+        position: relative;
+      }
+      .m-item:hover {
+        background: #f8fafc;
+      }
+      .m-item.unread {
+        background: #eff6ff;
+      }
+      .m-item.unread::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: #2563eb;
+      }
+      .m-view {
+        flex: 1;
+        padding: 30px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .m-h-sub {
+        font-size: 20px;
+        font-weight: 800;
+        margin-bottom: 15px;
+      }
+      .m-h-meta {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+        color: #64748b;
+        font-size: 13px;
+      }
+      .m-body {
+        line-height: 1.6;
+        font-size: 15px;
+        color: #334155;
+      }
+      .m-code-box {
+        background: #f1f5f9;
+        border: 2px dashed #cbd5e1;
+        padding: 20px;
+        text-align: center;
+        font-size: 24px;
+        font-family: "JetBrains Mono";
+        letter-spacing: 5px;
+        color: #0f172a;
+        margin: 20px 0;
+        border-radius: 8px;
+      }
+
+      /* BROWSER */
+      .app-browser {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      .b-toolbar {
+        height: 50px;
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        padding: 0 15px;
+        gap: 12px;
+      }
+      .b-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #f1f5f9;
+        border-radius: 6px;
+        color: #64748b;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .b-btn:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      .b-omnibox {
+        flex: 1;
+        height: 36px;
+        background: #f1f5f9;
+        border: 1px solid transparent;
+        border-radius: 18px;
+        padding: 0 20px;
+        display: flex;
+        align-items: center;
+        font-size: 13px;
+        color: #334155;
+      }
+      .b-omnibox input {
+        width: 100%;
+        border: none;
+        background: transparent;
+        outline: none;
+      }
+      .b-view {
+        flex: 1;
+        overflow-y: auto;
+        position: relative;
+      }
+
+      /* PHOTOS */
+      .app-photos {
+        display: flex;
+        height: 100%;
+        background: #111;
+        color: #eee;
+      }
+      .p-grid {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 10px;
+        align-content: flex-start;
+      }
+      .p-thumb {
+        aspect-ratio: 1;
+        background: #222;
+        border-radius: 6px;
+        overflow: hidden;
+        cursor: pointer;
+        position: relative;
+        border: 2px solid transparent;
+      }
+      .p-thumb:hover {
+        border-color: var(--color-accent);
+      }
+      .p-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .p-canvas {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(#222 1px, transparent 1px);
+        background-size: 30px 30px;
+      }
+      .p-img-full {
+        max-width: 90%;
+        max-height: 90%;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+      }
+      .p-sidebar {
+        width: 360px;
+        background: #1a1a1a;
+        border-left: 1px solid #333;
+        padding: 20px;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+      }
+      .p-meta-row {
+        margin-bottom: 12px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 8px;
+      }
+      .p-meta-lbl {
+        color: #666;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+        display: block;
+        font-size: 10px;
+      }
+      .btn-scan {
+        margin-top: auto;
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, var(--color-accent), #7c3aed);
+        border: none;
+        color: white;
+        font-weight: 900;
+        cursor: pointer;
+        border-radius: 10px;
+      }
+      .btn-scan[disabled] {
+        opacity: 0.7;
+        cursor: wait;
+      }
+      .scan-line {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: #0f0;
+        box-shadow: 0 0 15px #0f0;
+        animation: scan 2s linear infinite;
+        display: none;
+        z-index: 20;
+      }
+      @keyframes scan {
+        0% {
+          top: 0;
+        }
+        50% {
+          top: 100%;
+        }
+        100% {
+          top: 0;
+        }
+      }
+
+      /* VAULT */
+      .app-vault {
+        display: flex;
+        height: 100%;
+        background: #1c1c1e;
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+      }
+      .vault-lock {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+        background-image: radial-gradient(#333 1px, transparent 1px);
+        background-size: 30px 30px;
+      }
+      .vault-icon-lg {
+        font-size: 64px;
+        margin-bottom: 20px;
+      }
+      .vault-input {
+        background: #333;
+        border: 1px solid #555;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 24px;
+        letter-spacing: 5px;
+        text-align: center;
+        width: 220px;
+      }
+      .vault-hint {
+        margin-top: 15px;
+        color: #777;
+        font-size: 12px;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      .vault-sidebar {
+        width: 280px;
+        background: #2c2c2e;
+        border-right: 1px solid #3a3a3c;
+        display: flex;
+        flex-direction: column;
+      }
+      .vault-search {
+        padding: 15px;
+        border-bottom: 1px solid #3a3a3c;
+      }
+      .vs-input {
+        width: 100%;
+        background: #1c1c1e;
+        border: none;
+        padding: 10px;
+        border-radius: 8px;
+        color: #aeaeb2;
+      }
+      .vault-list {
+        flex: 1;
+        overflow-y: auto;
+      }
+      .v-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #3a3a3c;
+        cursor: pointer;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .v-item:hover {
+        background: #3a3a3c;
+      }
+      .v-img {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #48484a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+      }
+      .v-info {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .v-site {
+        font-weight: 800;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+      .v-user {
+        font-size: 12px;
+        opacity: 0.7;
+      }
+      .vault-detail {
+        flex: 1;
+        padding: 30px;
+        background: #1c1c1e;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .vd-card {
+        width: 100%;
+        max-width: 460px;
+        background: #2c2c2e;
+        border-radius: 14px;
+        padding: 20px;
+      }
+      .vd-row {
+        margin-bottom: 18px;
+      }
+      .vd-label {
+        color: #8e8e93;
+        font-size: 12px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+      .vd-val {
+        font-size: 16px;
+        font-family: "JetBrains Mono", monospace;
+        border-bottom: 1px solid #48484a;
+        padding-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .vd-copy {
+        font-size: 12px;
+        color: #0a84ff;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="crt-overlay"></div>
+    <div id="boot-layer">
+      <div id="boot-log"></div>
+    </div>
+
+    <div id="difficulty-layer" class="hidden" style="position: fixed; inset: 0; z-index: 6000; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); font-family: 'Share Tech Mono', monospace;">
+      <h2 style="color: var(--color-accent); margin-bottom: 30px; font-size: 24px; text-shadow: 0 0 10px var(--color-accent);">SÉLECTION DE LA DIFFICULTÉ</h2>
+      <div style="display: flex; gap: 20px;">
+        <button id="btn-diff-easy" style="padding: 20px 40px; background: rgba(16, 185, 129, 0.1); border: 2px solid var(--color-success); color: var(--color-success); border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s; font-family: inherit;">AVEC INDICES<br><span style="font-size: 10px; opacity: 0.7;">(Mode Normal)</span></button>
+        <button id="btn-diff-hard" style="padding: 20px 40px; background: rgba(239, 68, 68, 0.1); border: 2px solid var(--color-danger); color: var(--color-danger); border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s; font-family: inherit;">SANS INDICES<br><span style="font-size: 10px; opacity: 0.7;">(Mode Expert)</span></button>
+      </div>
+    </div>
+
+    <div id="login-layer">
+      <div id="login-timer-display" style="position: absolute; top: 30px; right: 40px; font-family: 'Share Tech Mono', monospace; font-size: 32px; color: var(--color-warning); text-shadow: 0 0 15px var(--color-warning); z-index: 5002; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">15:00</div>
+      <div id="mission-intro-container" style="text-align: center; margin-bottom: 20px; max-width: 400px; z-index: 5001;">
+        <button id="toggle-intro" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 8px; cursor: pointer; margin-bottom: 10px; font-size: 12px;">Afficher/Masquer la mission</button>
+        <p id="mission-intro-text" style="color: #94a3b8; font-size: 13px; line-height: 1.5; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+          Bienvenue, agent. Votre mission est d'infiltrer le système de Julien Dupuis pour accéder à son Cloud personnel. Le poste est verrouillé, à vous de trouver une faille.
+        </p>
+      </div>
+      <div class="login-box">
+        <div class="avatar"></div>
+        <h2 style="margin: 10px 0; color: white; font-weight: 600">
+          Julien Dupuis
+        </h2>
+        <div style="margin-top: 20px; text-align: left; display: flex; flex-direction: column; gap: 10px;">
+          <input type="text" id="login-user" placeholder="Identifiant" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: white; outline: none;">
+          <input type="password" id="login-pass" placeholder="Mot de passe" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: white; outline: none;">
+          <button id="btn-login-submit" style="width: 100%; padding: 12px; background: var(--color-accent); border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 5px; transition: 0.2s;">Se connecter</button>
+        </div>
+        <div class="btn-recovery" id="btn-guest">⚡ Démarrage d'urgence</div>
+      </div>
+    </div>
+
+    <div id="win-screen" class="hidden" style="position: fixed; inset: 0; z-index: 10000; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--color-success); font-family: 'Share Tech Mono', monospace; text-align: center;">
+       <h1 style="font-size: 48px; text-shadow: 0 0 15px var(--color-success); margin-bottom: 20px;">VOUS AVEZ GAGNÉ !</h1>
+       <p style="color: white; font-size: 18px;">Accès total accordé au système.</p>
+       <button id="btn-win-back" style="margin-top: 20px; background: var(--color-success); border: none; color: black; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">Retour à l'accueil</button>
+    </div>
+
+    <div id="fail-screen" class="hidden" style="position: fixed; inset: 0; z-index: 10000; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--color-danger); font-family: 'Share Tech Mono', monospace; text-align: center;">
+       <h1 style="font-size: 48px; text-shadow: 0 0 15px var(--color-danger); margin-bottom: 20px;">VOUS AVEZ ÉCHOUÉ !</h1>
+       <p style="color: white; font-size: 18px; margin-bottom: 30px;">Le temps est écoulé. Le système s'est auto-détruit.</p>
+       <button onclick="location.reload()" style="background: var(--color-danger); border: none; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold;">Réessayer</button>
+    </div>
+
+    <div id="toast-area"></div>
+
+    <div id="desktop" class="hidden">
+      <div id="status-bar">
+        <div class="sb-group">
+          <span style="font-weight: 900"> OSINT-OS</span>
+          <span>Fichier</span>
+          <span>Édition</span>
+          <span>Outils</span>
+          <span>Aide</span>
+        </div>
+        <div class="sb-group">
+          <span id="game-timer" style="color: var(--color-warning); font-weight: bold; margin-right: 10px;">15:00</span>
+          <button id="btn-logout" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-right: 10px;">Déconnexion</button>
+          <span>📶 Public_Guest</span>
+          <span id="battery-display">🔋 84%</span>
+          <span id="clock" class="font-mono">00:00</span>
+        </div>
+      </div>
+
+      <div id="mission-hud">
+        <div class="hud-header">
+          <span class="hud-title">Indices</span>
+          <button id="btn-toggle-hints" style="background:none; border:1px solid #94a3b8; color:#94a3b8; font-size:10px; cursor:pointer; border-radius:4px; padding:2px 5px;">Masquer</button>
+        </div>
+        <div id="hint-selector" style="display:flex; gap:5px; margin-top:10px;">
+          <button data-action="get-hint" data-level="small" style="flex:1; background:rgba(59,130,246,0.1); border:1px solid var(--color-accent); color:var(--color-accent); font-size:10px; cursor:pointer; border-radius:4px; padding:4px;">Petit</button>
+          <button data-action="get-hint" data-level="medium" style="flex:1; background:rgba(59,130,246,0.1); border:1px solid var(--color-accent); color:var(--color-accent); font-size:10px; cursor:pointer; border-radius:4px; padding:4px;">Moyen</button>
+          <button data-action="get-hint" data-level="solution" style="flex:1; background:rgba(239,68,68,0.1); border:1px solid var(--color-danger); color:var(--color-danger); font-size:10px; cursor:pointer; border-radius:4px; padding:4px;">Solution</button>
+        </div>
+        <div id="mission-brief" style="margin-top:15px; min-height:40px;">
+          <div style="color: #94a3b8; font-style: italic; font-size: 12px;">Sélectionnez un niveau d'indice pour avancer.</div>
+        </div>
+      </div>
+
+      <div id="icon-grid"></div>
+      <div id="windows-area"></div>
+
+      <div id="dock-container">
+        <div id="dock"></div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const $ = (sel, root = document) => root.querySelector(sel);
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+        const escapeHtml = (s) =>
+          String(s)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+
+        function setFavicon(locked) {
+          const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+              <rect width="64" height="64" rx="14" fill="${
+                locked ? "#ef4444" : "#10b981"
+              }"/>
+              <text x="32" y="42" font-size="34" text-anchor="middle">🔒</text>
+            </svg>`;
+          const href =
+            "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+          document.getElementById("dyn-favicon")?.setAttribute("href", href);
+        }
+
+        // -------------------------------------------------------
+        // GAME STATE (lore + progression)
+        // -------------------------------------------------------
+        const CITIES = ["Lyon", "Paris", "Marseille", "Bordeaux", "Nantes"];
+        const DOGS = ["Rocky", "Max", "Bella", "Luna", "Toby"];
+        const PLACES = ["Bali", "Rome", "Tokyo", "New York", "Londres"];
+        const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+        const randomCity = CITIES[Math.floor(Math.random() * CITIES.length)];
+        const randomDog = DOGS[Math.floor(Math.random() * DOGS.length)];
+        const randomPlace = PLACES[Math.floor(Math.random() * PLACES.length)];
+        const randomYear = 1985 + Math.floor(Math.random() * 15);
+        const randomDay = Math.floor(Math.random() * 28) + 1;
+        const randomMonth = Math.floor(Math.random() * 12) + 1;
+        
+        const birthDayStr = String(randomDay).padStart(2, '0');
+        const birthMonthStr = String(randomMonth).padStart(2, '0');
+        const birthDate = `${birthDayStr}/${birthMonthStr}/${randomYear}`;
+        const badge = Math.floor(1000 + Math.random() * 9000).toString();
+        const vpnPass = "TempPass" + (2020 + Math.floor(Math.random() * 10)) + "!";
+
+        const STATE = {
+          difficulty: 'normal',
+          missions: [
+            {
+              id: "start",
+              txt: "Une porte semble entrouverte...",
+              done: false,
+            },
+            {
+              id: "cloud_recovery",
+              txt: "La mémoire fait défaut.",
+              done: false,
+            },
+            {
+              id: "cloud",
+              txt: "Le voile se lève.",
+              done: false,
+            },
+          ],
+          flags: {
+            recovered_code: false,
+            facelook_session: false,
+            car_plate_found: false,
+            vault_unlocked: false,
+            badge_found: false,
+            cloud_session: false,
+            cloud_pin_unlocked: false,
+
+            facelook_recovery_sent: false,
+            ending_choice: null, // "A" | "B"
+            timeLeft: 900,
+            timerInterval: null,
+          },
+        };
+
+        const TARGET = {
+          name: "Julien Dupuis",
+          recoveryCode: Math.floor(100000 + Math.random() * 900000).toString(),
+          platePin: Math.floor(Math.random() * 10000).toString().padStart(4, '0'),
+          badgeNumber: badge,
+          cloudPass: "PROJET-" + badge,
+          winPass: "efrei" + Math.floor(1000 + Math.random() * 9000).toString(),
+          job2020: "Vendeur",
+          security: {
+            dog: randomDog,
+            place: randomPlace
+          },
+          birth: {
+            date: birthDate,
+            city: randomCity
+          }
+        };
+
+        // -------------------------------------------------------
+        // DATA (emails/fichiers)
+        // -------------------------------------------------------
+        const EMAILS = [
+          {
+            id: 170,
+            from: "Maman",
+            sub: "Joyeux anniversaire !",
+            date: `${birthDayStr}/${birthMonthStr}/2025`,
+            folder: "archive",
+            read: true,
+            body: `
+              Mon petit Julien,<br><br>
+              Déjà ${2025 - randomYear} ans ! Que le temps passe vite depuis ce fameux ${randomDay} ${MONTHS[randomMonth-1]} à <b>${TARGET.birth.city}</b>.<br>
+              Profite bien de ta journée.<br>
+              Grosses bises.
+            `,
+          },
+          {
+            id: 101,
+            from: "FaceLook Security",
+            sub: "Récupération de vos identifiants",
+            date: "À l'instant",
+            folder: "inbox",
+            read: false,
+            hidden: true,
+            body: `
+              Bonjour Julien,<br><br>Suite à votre demande de vérification, voici vos identifiants de connexion :<br><br>Email : <b>julien.d@mail.com</b><br>Mot de passe : <b>Juju${randomYear}</b><br><br>Cordialement,<br>L'équipe de sécurité FaceLook.
+            `,
+          },
+          {
+            id: 201,
+            from: "Amazon.fr",
+            sub: "Votre commande est en route",
+            date: "10/01/2025",
+            folder: "inbox",
+            read: true,
+            body: "Votre colis contenant 'Support voiture universel' sera livré aujourd'hui.",
+          },
+          {
+            id: 202,
+            from: "Newsletter Tech",
+            sub: "Les tendances Cybersécurité 2025",
+            date: "09/01/2025",
+            folder: "inbox",
+            read: false,
+            body: "Découvrez notre dossier spécial sur les attaques par ingénierie sociale.",
+          },
+          {
+            id: 204,
+            from: "Voyages Privés",
+            sub: "Votre séjour à Rome",
+            date: "15/06/2025",
+            folder: "archive",
+            read: true,
+            body: "Merci d'avoir choisi notre agence pour votre week-end à Rome.",
+          },
+          {
+            id: 205,
+            from: "Netflix",
+            sub: "Nouveautés pour vous",
+            date: "12/01/2025",
+            folder: "inbox",
+            read: false,
+            body: "Découvrez les films et séries ajoutés cette semaine.",
+          },
+          {
+            id: 301,
+            from: "Gagner-Millions",
+            sub: "FÉLICITATIONS !!!",
+            date: "14/01/2025",
+            folder: "spam",
+            read: false,
+            body: "Vous avez été sélectionné pour gagner 1.000.000 d'euros ! Cliquez ici pour réclamer votre prix.",
+          },
+          {
+            id: 302,
+            from: "Pharma-Direct",
+            sub: "Offre spéciale sur les vitamines",
+            date: "13/01/2025",
+            folder: "spam",
+            read: false,
+            body: "Profitez de 50% de réduction sur tous nos compléments alimentaires. Livraison gratuite !",
+          },
+          {
+            id: 303,
+            from: "IT-Support-Global",
+            sub: "URGENT: Votre nouvel accès VPN",
+            date: "Hier",
+            folder: "spam",
+            read: false,
+            body: `Cher collaborateur, votre accès VPN a été réinitialisé. Votre nouveau mot de passe temporaire est : <b>${vpnPass}</b>. Veuillez le changer dès que possible sur le portail interne.`,
+          },
+        ];
+
+        const FILES = [
+          {
+            id: "doc_cv",
+            name: "CV_Julien_Dupuis.pdf",
+            type: "cv",
+          },
+          {
+            id: "txt_old_pass",
+            name: "anciens_passwords.txt",
+            type: "text",
+            content: "Compte Netflix: juju-cool / 123456\nCompte Fnac: julien.d@mail.com / Fnac2020\n\nNote: J'ai tout déplacé dans le PassVault, c'est plus sûr.",
+          },
+        ];
+
+        const VAULT_DATA = [
+          {
+            site: "CloudDrive",
+            user: "j.dupuis",
+            pass: "********",
+            icon: "☁️",
+            note: "Standard corp: PROJET- + identifiant interne",
+          },
+          {
+            site: "FaceLook",
+            user: "julien.d@mail.com",
+            pass: "Ancien mdp",
+            icon: "👥",
+            note: "Compte verrouillé. Voir mail sécurité.",
+          },
+          {
+            site: "Session Windows",
+            user: `INGENIEUR${TARGET.badgeNumber}`,
+            pass: TARGET.winPass,
+            icon: "💻",
+            note: "Identifiant: [METIER][BADGE]",
+          },
+        ].sort((a, b) => a.site.localeCompare(b.site));
+
+        // -------------------------------------------------------
+        // TOAST
+        // -------------------------------------------------------
+        const Toast = {
+          show(title, msg, type = "info") {
+            const area = $("#toast-area");
+            if (!area) return;
+            const t = document.createElement("div");
+            t.className = "toast";
+            const color =
+              type === "success"
+                ? "#10b981"
+                : type === "error"
+                  ? "#ef4444"
+                  : type === "warning"
+                    ? "#f59e0b"
+                    : "#3b82f6";
+            t.style.borderLeftColor = color;
+            t.innerHTML = `<strong style="color:${color}">${escapeHtml(
+              title,
+            )}</strong><span style="opacity:0.85; font-size:12px">${msg}</span>`;
+            area.appendChild(t);
+            setTimeout(() => t.remove(), 4200);
+          },
+        };
+
+        // -------------------------------------------------------
+        // MISSION CONTROL
+        // -------------------------------------------------------
+        const MissionControl = {
+          render() {},
+          current() {
+            return STATE.missions.find((m) => !m.done)?.id || null;
+          },
+          complete(id) {
+            const m = STATE.missions.find((x) => x.id === id);
+            if (m && !m.done) {
+              m.done = true;
+              Story.onMissionChange();
+
+              if (id === "cloud") {
+                setFavicon(false);
+              }
+            }
+          },
+        };
+
+        // -------------------------------------------------------
+        // STORY (aides subtiles + hard mode)
+        // -------------------------------------------------------
+        const Story = {
+          hints: {
+            start: {
+              small: "Le système est verrouillé. Il doit bien y avoir une session invité quelque part...",
+              medium: "Regardez bien l'écran de connexion, une option d'urgence est souvent disponible.",
+              solution: "Cliquez sur 'Démarrage d'urgence' en bas de la boîte de connexion pour entrer."
+            },
+            facelook: {
+              small: "FaceLook demande une date et une ville de naissance. Quelqu'un de proche a dû lui souhaiter son anniversaire par mail...",
+              medium: `Cherchez un mail de 'Maman' dans les archives. Elle mentionne ${TARGET.birth.city} et le ${randomDay} ${MONTHS[randomMonth-1]}.`,
+              solution: `Date: ${TARGET.birth.date}, Ville: ${TARGET.birth.city}. Puis récupérez le mot de passe dans le nouveau mail de FaceLook Security.`
+            },
+            cloud_recovery: {
+              small: "Pour réinitialiser un accès, il faut souvent connaître la vie privée de la cible.",
+              medium: "Regardez les photos et les commentaires sur FaceLook. Marc mentionne une plaque et Julien parle de son chien.",
+              solution: `Animal: ${TARGET.security.dog}, Destination: ${TARGET.security.place}.`
+            },
+            passvault: {
+              small: "Vous êtes dans le Cloud, mais le fichier PIN est protégé. Quel était son métier en 2020 ?",
+              medium: "Le CV dans le Finder contient son historique professionnel.",
+              solution: "Répondez 'Vendeur' pour obtenir le code PIN."
+            },
+            final: {
+              small: "Utilisez le code PIN trouvé dans le Cloud pour ouvrir le PassVault.",
+              medium: "L'identifiant Windows est une combinaison de son métier actuel et de son badge.",
+              solution: `User: INGENIEUR${TARGET.badgeNumber}, Pass: ${TARGET.winPass}. Déconnectez-vous pour entrer ces infos.`
+            }
+          },
+
+          setBrief(text) {
+            const el = $("#mission-brief");
+            if (!el) return;
+            el.innerHTML = `<div style="color: #94a3b8; font-style: italic; margin-bottom: 10px;">${text}</div>`;
+          },
+
+          updateHint(level) {
+            if (!level) {
+              this.setBrief("Sélectionnez un niveau d'indice pour avancer.");
+              return;
+            }
+
+            let category = "start";
+            const f = STATE.flags;
+
+            if (MissionControl.current() === "start") {
+              category = "start";
+            } else if (!f.facelook_session) {
+              category = "facelook";
+            } else if (!f.cloud_session) {
+              category = "cloud_recovery";
+            } else if (!f.vault_unlocked) {
+              category = "passvault";
+            } else {
+              category = "final";
+            }
+
+            const hint = this.hints[category]?.[level];
+            if (hint) this.setBrief(hint);
+          },
+
+          onMissionChange() {
+            this.updateHint();
+          },
+        };
+
+        // -------------------------------------------------------
+        // WINDOW MANAGER
+        // -------------------------------------------------------
+        let zIndex = 100;
+        const WindowManager = {
+          create(id, title, content, w = 900, h = 600) {
+            const existing = document.getElementById(`win-${id}`);
+            if (existing) return this.focus(id);
+
+            const win = document.createElement("div");
+            win.id = `win-${id}`;
+            win.className = "window open";
+
+            const left = clamp(
+              (window.innerWidth - w) / 2 + (Math.random() * 40 - 20),
+              10,
+              window.innerWidth - w - 10,
+            );
+            const top = clamp(
+              (window.innerHeight - h) / 2 + (Math.random() * 40 - 20),
+              50,
+              window.innerHeight - h - 90,
+            );
+
+            Object.assign(win.style, {
+              width: `${w}px`,
+              height: `${h}px`,
+              left: `${left}px`,
+              top: `${top}px`,
+              zIndex: ++zIndex,
+            });
+
+            win.innerHTML = `
+              <div class="win-header" data-drag="${id}">
+                <div class="win-controls">
+                  <div class="wc-btn wc-close" data-close="${id}"></div>
+                  <div class="wc-btn wc-min"></div>
+                  <div class="wc-btn wc-max"></div>
+                </div>
+                <div class="win-title">${escapeHtml(title)}</div>
+              </div>
+              <div class="win-content">${content}</div>
+            `;
+
+            win.addEventListener("mousedown", () => this.focus(id));
+            $("#windows-area")?.appendChild(win);
+
+            const dockIcon = document.getElementById(`dock-${id.split("-")[0]}`);
+            dockIcon?.classList.add("running");
+
+            win.querySelector(`[data-close="${id}"]`)?.addEventListener(
+              "click",
+              (e) => {
+                e.stopPropagation();
+                this.close(id);
+              },
+            );
+
+            const header = win.querySelector(`[data-drag="${id}"]`);
+            header?.addEventListener("mousedown", (e) =>
+              this.dragStart(e, id),
+            );
+          },
+          close(id) {
+            const win = document.getElementById(`win-${id}`);
+            if (!win) return;
+            win.classList.remove("open");
+            setTimeout(() => {
+              win.remove();
+              const appType = id.split('-')[0];
+              if (!document.querySelector(`.window[id^="win-${appType}"]`)) {
+                document.getElementById(`dock-${appType}`)?.classList.remove("running");
+              }
+            }, 200);
+          },
+          focus(id) {
+            const win = document.getElementById(`win-${id}`);
+            if (win) win.style.zIndex = ++zIndex;
+          },
+          dragStart(e, id) {
+            const win = document.getElementById(`win-${id}`);
+            if (!win) return;
+            if (e.target?.classList?.contains("wc-btn")) return;
+
+            this.focus(id);
+            const rect = win.getBoundingClientRect();
+            const offX = e.clientX - rect.left;
+            const offY = e.clientY - rect.top;
+
+            const move = (ev) => {
+              const x = clamp(ev.clientX - offX, 0, window.innerWidth - 50);
+              const y = clamp(ev.clientY - offY, 0, window.innerHeight - 50);
+              win.style.left = `${x}px`;
+              win.style.top = `${y}px`;
+            };
+
+            const up = () => {
+              document.removeEventListener("mousemove", move);
+              document.removeEventListener("mouseup", up);
+            };
+
+            document.addEventListener("mousemove", move);
+            document.addEventListener("mouseup", up);
+          },
+        };
+
+        // -------------------------------------------------------
+        // APPS
+        // -------------------------------------------------------
+        const Apps = {
+          launch(app) {
+            const map = {
+              finder: Apps.Finder.open,
+              mail: Apps.Mail.open,
+              browser: Apps.Browser.open,
+              vault: Apps.PassVault.open,
+            };
+            const fn = map[app];
+            if (!fn)
+              return Toast.show("Erreur", "Application introuvable.", "error");
+            fn();
+          },
+
+          Finder: {
+            open() {
+              const html = `
+                <div style="padding:16px; color:#e2e8f0;">
+                  <div style="opacity:.85; margin-bottom:12px;">
+                    Accès limité (invité). Fichiers accessibles :
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px;">
+                    ${FILES.filter(f => f.type !== "img").map((f) => {
+                      const icon = "📄";
+                      return `<div style="border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:12px; cursor:pointer;"
+                        data-action="open-file" data-file-id="${f.id}">
+                        <div style="font-size:26px; margin-bottom:8px">${icon}</div>
+                        <div style="font-size:12px; opacity:.9">${escapeHtml(
+                          f.name,
+                        )}</div>
+                      </div>`;
+                    }).join("")}
+                  </div>
+                </div>
+              `;
+              WindowManager.create("finder", "Finder (Invité)", html, 900, 560);
+            },
+          },
+
+          Mail: {
+            folder: "inbox",
+            open() {
+              const html = `
+                <div class="app-mail">
+                  <div class="m-sb">
+                    <div class="m-folder ${
+                      Apps.Mail.folder === "inbox" ? "active" : ""
+                    }" data-action="mail-folder" data-folder="inbox">
+                      📥 Réception
+                    </div>
+                    <div class="m-folder ${
+                      Apps.Mail.folder === "archive" ? "active" : ""
+                    }" data-action="mail-folder" data-folder="archive">
+                      🗄️ Archives
+                    </div>
+                    <div class="m-folder ${
+                      Apps.Mail.folder === "spam" ? "active" : ""
+                    }" data-action="mail-folder" data-folder="spam">
+                      ⚠️ Spams
+                    </div>
+                  </div>
+                  <div class="m-list" id="mail-list"></div>
+                  <div class="m-view" id="mail-content">
+                    <div class="flex-center full-size text-dim">Sélectionnez un email</div>
+                  </div>
+                </div>
+              `;
+              WindowManager.create("mail", "Mail", html, 1040, 680);
+              Apps.Mail.renderList();
+            },
+            renderList() {
+              const list = document.getElementById("mail-list");
+              if (!list) return;
+
+              const mails = EMAILS
+                .filter((m) => m.folder === Apps.Mail.folder && (!m.hidden || STATE.flags.facelook_recovery_sent))
+                .sort((a, b) => b.id - a.id);
+
+              list.innerHTML = mails
+                .map(
+                  (m) => `
+                  <div class="m-item ${
+                    m.read ? "" : "unread"
+                  }" data-action="open-mail" data-mail-id="${m.id}">
+                    <div style="font-weight:900; margin-bottom:4px;">${escapeHtml(
+                      m.from,
+                    )}</div>
+                    <div style="font-size:12px; color:#64748b;">${escapeHtml(
+                      m.sub,
+                    )}</div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">${escapeHtml(
+                      m.date,
+                    )}</div>
+                  </div>`,
+                )
+                .join("");
+            },
+            read(id) {
+              const m = EMAILS.find((x) => String(x.id) === String(id));
+              if (!m) return;
+
+              m.read = true;
+              Apps.Mail.renderList();
+
+              document.getElementById("mail-content").innerHTML = `
+                <div class="m-h-sub">${escapeHtml(m.sub)}</div>
+                <div class="m-h-meta">
+                  <span>De: <strong>${escapeHtml(m.from)}</strong></span>
+                  <span>Date: ${escapeHtml(m.date)}</span>
+                </div>
+                <div class="m-body">${m.body}</div>
+              `;
+            },
+          },
+
+          PassVault: {
+            isLocked: true,
+            open() {
+              if (Apps.PassVault.isLocked) {
+                const html = `
+                  <div class="app-vault">
+                    <div class="vault-lock">
+                      <div class="vault-icon-lg">🔐</div>
+                      <h2 style="margin-bottom:10px;">PassVault</h2>
+                      <p style="color:#aaa; margin-bottom:20px;">Master PIN</p>
+                      <input type="password" id="pv-pin" class="vault-input" maxlength="4" placeholder="••••" />
+                      <div class="vault-hint" data-action="vault-hint">Besoin d'un indice ?</div>
+                      <button
+                        style="margin-top:20px; width:220px; padding:12px; border:0; border-radius:10px; cursor:pointer; font-weight:900; background:#0a84ff; color:white;"
+                        data-action="vault-unlock"
+                      >DÉVERROUILLER</button>
+                    </div>
+                  </div>
+                `;
+                WindowManager.create("vault", "PassVault", html, 920, 560);
+                setTimeout(() => document.getElementById("pv-pin")?.focus(), 60);
+              } else {
+                Apps.PassVault.renderDashboard();
+              }
+            },
+            unlock() {
+              const input = document.getElementById("pv-pin");
+              if (!input) return;
+
+              if (input.value === TARGET.platePin) {
+                Apps.PassVault.isLocked = false;
+                STATE.flags.vault_unlocked = true;
+                MissionControl.complete("vault");
+                Toast.show("PassVault", "Coffre déverrouillé.", "success");
+                Apps.PassVault.renderDashboard();
+                Story.onMissionChange();
+              } else {
+                input.value = "";
+                Toast.show("PassVault", "PIN incorrect.", "error");
+              }
+            },
+            renderDashboard() {
+              const content = document.querySelector("#win-vault .win-content");
+              if (!content) return;
+
+              content.innerHTML = `
+                <div class="app-vault">
+                  <div class="vault-sidebar">
+                    <div class="vault-search">
+                      <input class="vs-input" placeholder="Rechercher..." data-action="vault-filter" />
+                    </div>
+                    <div class="vault-list" id="pv-list"></div>
+                  </div>
+                  <div class="vault-detail" id="pv-detail">
+                    <div style="opacity:0.35; text-align:center;">
+                      <div style="font-size:44px;">🛡️</div>
+                      <p>Sélectionnez un compte</p>
+                    </div>
+                  </div>
+                </div>
+              `;
+              Apps.PassVault.renderList(VAULT_DATA);
+            },
+            renderList(data) {
+              const list = document.getElementById("pv-list");
+              if (!list) return;
+              list.innerHTML = data
+                .map(
+                  (item) => `
+                  <div class="v-item" data-action="vault-detail" data-site="${escapeHtml(
+                    item.site,
+                  )}">
+                    <div class="v-img">${escapeHtml(item.icon || "🔑")}</div>
+                    <div class="v-info">
+                      <div class="v-site">${escapeHtml(item.site)}</div>
+                      <div class="v-user">${escapeHtml(item.user || "")}</div>
+                    </div>
+                  </div>
+                `,
+                )
+                .join("");
+            },
+            filter(q) {
+              const query = (q || "").toLowerCase();
+              const filtered = VAULT_DATA.filter(
+                (i) =>
+                  (i.site || "").toLowerCase().includes(query) ||
+                  (i.user || "").toLowerCase().includes(query),
+              );
+              Apps.PassVault.renderList(filtered);
+            },
+            detail(site) {
+              const data = VAULT_DATA.find((x) => x.site === site);
+              const detail = document.getElementById("pv-detail");
+              if (!data || !detail) return;
+
+              detail.innerHTML = `
+                <div class="vd-card">
+                  <div style="text-align:center; margin-bottom:18px;">
+                    <div style="font-size:52px; margin-bottom:8px;">${escapeHtml(
+                      data.icon || "🔑",
+                    )}</div>
+                    <h2 style="margin:0;">${escapeHtml(data.site)}</h2>
+                  </div>
+
+                  <div class="vd-row">
+                    <div class="vd-label">Identifiant</div>
+                    <div class="vd-val">
+                      <span>${escapeHtml(data.user || "")}</span>
+                      <span class="vd-copy" data-action="copy" data-copy="${escapeHtml(
+                        data.user || "",
+                      )}">COPIER</span>
+                    </div>
+                  </div>
+
+                  <div class="vd-row">
+                    <div class="vd-label">Mot de passe / PIN</div>
+                    <div class="vd-val">
+                      <span style="filter:blur(4px);" onmouseover="this.style.filter='none'" onmouseout="this.style.filter='blur(4px)'">${escapeHtml(
+                        data.pass || "",
+                      )}</span>
+                      <span class="vd-copy" data-action="copy" data-copy="${escapeHtml(
+                        data.pass || "",
+                      )}">COPIER</span>
+                    </div>
+                  </div>
+
+                  ${
+                    data.note
+                      ? `<div class="vd-row">
+                          <div class="vd-label">Notes</div>
+                          <div style="background:#3a3a3c; padding:12px; border-radius:10px; font-size:12px; color:#ddd;">${escapeHtml(
+                            data.note,
+                          )}</div>
+                        </div>`
+                      : ""
+                  }
+                </div>
+              `;
+            },
+          },
+
+          Browser: {
+            open(forceNew = false) {
+              const winId = forceNew ? `browser-${Date.now()}` : "browser";
+              const existing = document.getElementById(`win-${winId}`);
+              if (existing) return WindowManager.focus(winId);
+
+             const html = `
+                <div class="app-browser">
+                  <div class="b-toolbar">
+                    <button class="b-btn" data-action="go" data-route="home">🏠</button>
+                    <button class="b-btn" data-action="reload">↻</button>
+                    <button class="b-btn" data-action="launch-new-browser" title="Nouvelle fenêtre" style="margin-left:5px;">➕</button>
+                    <div class="b-omnibox">
+                      <input class="url-bar-input" readonly value="about:blank" />
+                    </div>
+                  </div>
+                  <div class="b-view"></div>
+                </div>
+              `;
+              WindowManager.create(winId, "Navigateur", html, 1080, 680);
+              const win = document.getElementById(`win-${winId}`);
+              Apps.Browser.go("home", win);
+            },
+
+            go(route, win) {
+              if (!win) return;
+              win.dataset.lastRoute = route;
+              const view = win.querySelector(".b-view");
+              const url = win.querySelector(".url-bar-input");
+              if (!view || !url) return;
+
+              view.innerHTML = `
+                <div class="flex-center full-size">
+                  <div style="width:30px;height:30px;border:3px solid #ccc;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s infinite linear"></div>
+                </div>
+              `;
+
+              setTimeout(() => {
+                if (route === "home") {
+                  url.value = "https://www.google.com";
+                  view.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; background:white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px;">
+                      <div style="font-size: 72px; font-weight: 500; margin-bottom: 30px; letter-spacing: -2px;">
+                        <span style="color: #4285F4">G</span><span style="color: #EA4335">o</span><span style="color: #FBBC05">o</span><span style="color: #4285F4">g</span><span style="color: #34A853">l</span><span style="color: #EA4335">e</span>
+                      </div>
+                      <div style="width: 100%; max-width: 580px; height: 44px; border: 1px solid #dfe1e5; border-radius: 24px; display: flex; align-items: center; padding: 0 15px; margin-bottom: 30px;">
+                        <span style="color: #9aa0a6; margin-right: 10px;">🔍</span>
+                        <input type="text" style="flex: 1; border: none; outline: none; font-size: 16px;" readonly placeholder="Rechercher sur Google ou saisir une URL">
+                        <span style="color: #4285F4; cursor: pointer;">🎙️</span>
+                      </div>
+                      <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+                        <div data-action="go" data-route="facelook" class="fl-clickable" style="width: 112px; padding: 16px 8px; border-radius: 8px; text-align: center; cursor: pointer;">
+                          <div style="width: 48px; height: 48px; background: #f1f3f4; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #1877f2; margin: 0 auto 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">f</div>
+                          <div style="font-size: 12px; color: #3c4043;">FaceLook</div>
+                        </div>
+                        <div data-action="go" data-route="cloud" class="fl-clickable" style="width: 112px; padding: 16px 8px; border-radius: 8px; text-align: center; cursor: pointer;">
+                          <div style="width: 48px; height: 48px; background: #f1f3f4; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #2563eb; margin: 0 auto 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">☁️</div>
+                          <div style="font-size: 12px; color: #3c4043;">CloudDrive</div>
+                        </div>
+                      </div>
+                    </div>`;
+                } else if (route === "facelook") {
+                  if (STATE.flags.facelook_session) {
+                    url.value = "https://facelook.com/feed";
+                    view.innerHTML = `
+                      <div class="flex-center full-size" style="background:#f0f2f5;">
+                        <div style="background:white; padding:18px 22px; border-radius:12px; border:1px solid #e2e8f0;">
+                          <div style="font-weight:900; color:#1877f2; font-size:18px;">FaceLook</div>
+                          <div style="margin-top:6px; color:#64748b;">Session active.</div>
+                        </div>
+                      </div>`;
+                    setTimeout(() => Apps.Browser.go("facelook-feed", win), 300);
+                    return;
+                  }
+
+                  url.value = "https://facelook.com/login";
+                  view.innerHTML = `
+                    <div style="min-height:100%; background:#f0f2f5; display:flex; align-items:center; justify-content:center; padding:40px;">
+                      <div style="background:white; padding:25px; border-radius:8px; width:420px; text-align:center; box-shadow: 0 2px 4px rgba(0,0,0,.1), 0 8px 16px rgba(0,0,0,.1);">
+                        <h1 style="color:#1877f2; font-size:40px; margin:0 0 10px; font-family: Helvetica, Arial, sans-serif; font-weight: bold;">facelook</h1>
+                        <div style="margin-bottom: 15px;">
+                          <input id="fl-user" type="text" placeholder="Adresse e-mail ou numéro de tél." style="width:100%; padding:14px; border:1px solid #dddfe2; border-radius:6px; font-size:17px; margin-bottom:12px;">
+                          <input id="fl-pass" type="password" placeholder="Mot de passe" style="width:100%; padding:14px; border:1px solid #dddfe2; border-radius:6px; font-size:17px; margin-bottom:12px;">
+                          <button data-action="check-facelook-login" style="width:100%; padding:12px; background:#1877f2; color:white; border:none; border-radius:6px; font-size:20px; font-weight:bold; cursor:pointer;">Se connecter</button>
+                        </div>
+                        <div style="border-bottom: 1px solid #dadde1; margin: 20px 0;"></div>
+                        <button class="b-btn" style="width:auto; height:auto; padding:12px; background: none; color: #1877f2; border: none; font-size: 14px;" data-action="go" data-route="facelook-reset">
+                          Mot de passe oublié ?
+                        </button>
+                      </div>
+                    </div>
+                  `;
+                } else if (route === "facelook-reset") {
+                  url.value = "https://facelook.com/recover/init";
+                  view.innerHTML = `
+                    <div style="min-height:100%; background:#e9ebee; display:flex; justify-content:center; padding-top:90px;">
+                      <div style="background:white; padding:25px; border-radius:8px; width:420px; text-align:center;">
+                        <h3 style="margin-bottom:10px; color:#333;">Récupération</h3>
+                        <p style="margin-bottom:20px; color:#666; font-size:14px;">Vérification d'identité</p>
+                        <div style="text-align:left; font-size:12px; color:#666; margin-bottom:4px;">Date de naissance (JJ/MM/AAAA)</div>
+                        <input id="recovery-dob" placeholder="JJ/MM/AAAA" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:12px;">
+                        <div style="text-align:left; font-size:12px; color:#666; margin-bottom:4px;">Ville de naissance</div>
+                        <input id="recovery-city" placeholder="Ville" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:20px;">
+                        <button data-action="check-facelook-recovery" style="width:100%; padding:12px; background:#1877f2; color:white; border:none; border-radius:6px; font-size:18px; font-weight:bold; cursor:pointer;">
+                          Vérifier
+                        </button>
+                      </div>
+                    </div>
+                  `;
+                } else if (route === "facelook-feed") {
+                  url.value = "https://facelook.com/feed";
+                  view.innerHTML = `
+                    <div style="height:100%; display:flex; flex-direction:column; background:#f0f2f5; font-family: Segoe UI, Helvetica, Arial, sans-serif; color: #1c1e21; overflow: hidden;">
+                      <!-- Header -->
+                      <div style="background: white; height: 56px; display: flex; align-items: center; padding: 0 16px; box-shadow: 0 2px 4px rgba(0,0,0,.1); flex-shrink: 0;">
+                        <div style="color: #1877f2; font-size: 40px; font-weight: bold; margin-right: 10px; cursor: pointer;" data-action="go" data-route="facelook-feed">f</div>
+                        <div style="background: #f0f2f5; border-radius: 20px; padding: 6px 12px; flex: 0 1 300px; display: flex; align-items: center;">
+                          <span style="color: #65676b; margin-right: 8px;">🔍</span>
+                          <input type="text" placeholder="Rechercher" style="background: transparent; border: none; outline: none; width: 100%; font-size: 14px;">
+                        </div>
+                      </div>
+                      
+                      <div style="flex: 1; display: flex; max-width: 1100px; margin: 0 auto; padding: 12px 12px 100px 12px; gap: 12px; width: 100%; overflow-y: auto;">
+                        <!-- Left Sidebar -->
+                        <div style="flex: 0 0 240px;">
+                          <div style="display: flex; align-items: center; padding: 8px; border-radius: 8px;" class="fl-clickable">
+                            <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=100&auto=format&fit=crop" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 12px;" />
+                            <div style="font-weight: 600;">Julien Dupuis</div>
+                          </div>
+                          <div style="padding: 8px; border-radius: 8px; margin-top: 8px;" class="fl-clickable">👥 Amis</div>
+                          <div style="padding: 8px; border-radius: 8px;" class="fl-clickable">📺 Watch</div>
+                          <div style="padding: 8px; border-radius: 8px;" class="fl-clickable">🏪 Marketplace</div>
+                          <div style="padding: 8px; border-radius: 8px;" class="fl-clickable">🎮 Gaming</div>
+                          <div style="padding: 8px; border-radius: 8px;" class="fl-clickable">🕒 Souvenirs</div>
+                          <div style="padding: 8px; border-radius: 8px;" class="fl-clickable">🚩 Pages</div>
+                          <div style="padding: 8px; border-radius: 8px;" class="fl-clickable">📅 Évènements</div>
+                          <div style="padding: 8px; border-radius: 8px; border-top: 1px solid #ced0d4; margin-top: 8px; padding-top: 12px; color: #65676b; font-weight: 600; font-size: 13px;">Vos raccourcis</div>
+                          <div style="padding: 8px; border-radius: 8px;" class="fl-clickable">🚗 Passion Auto 500</div>
+                          
+                          <div style="margin-top: 12px; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.1);">
+                            <div style="font-weight: bold; margin-bottom: 8px;">Intro</div>
+                            <div style="font-size: 13px; color: #1c1e21; margin-bottom: 10px; text-align: center; font-style: italic;">"Vivre à 100 à l'heure..." 🏎️</div>
+                            <div style="font-size: 13px; color: #65676b; margin-bottom: 8px;">🏠 Habite à <b>${TARGET.birth.city}</b></div>
+                            <div style="font-size: 13px; color: #65676b; margin-bottom: 8px;">📍 De <b>${TARGET.birth.city}</b></div>
+                            <div style="font-size: 13px; color: #65676b; margin-bottom: 8px;">🎂 Né le ${TARGET.birth.date}</div>
+                            <div style="font-size: 13px; color: #65676b;">🆔 ID Employé: <b>${TARGET.badgeNumber}</b></div>
+                          </div>
+                        </div>
+
+                        <!-- Main Feed -->
+                        <div style="flex: 1; max-width: 500px;">
+                          <!-- Post 1 -->
+                          <div style="background: white; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.1); overflow: hidden;">
+                            <div style="padding: 10px;">
+                              <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=100&auto=format&fit=crop" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px;" />
+                                <div>
+                                  <div style="font-weight: 600;">Julien Dupuis</div>
+                                  <div style="font-size: 12px; color: #65676b;">12 août 2023 · 🌍</div>
+                                </div>
+                              </div>
+                              <p style="margin: 0 0 8px; font-size: 14px;">Enfin reçue ! Ma nouvelle petite merveille pour mon voyage à <b>${TARGET.security.place}</b>. Regardez cette plaque personnalisée ! 😍🚗</p>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=1000&auto=format&fit=crop" style="width: 100%; max-height: 240px; object-fit: cover; display: block; border-top: 1px solid #f0f2f5; border-bottom: 1px solid #f0f2f5;">
+                            <div style="padding: 8px 12px; font-size: 12px; color: #65676b; display: flex; justify-content: space-between; align-items: center;">
+                              <span>👍❤️ 142</span>
+                              <span>12 commentaires</span>
+                            </div>
+                            <div style="padding: 8px 12px; background: #f0f2f5; border-top: 1px solid #e4e6eb; font-size: 13px;">
+                              <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+                                <img src="https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?q=80&w=100&auto=format&fit=crop" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" />
+                                <div style="background: white; padding: 6px 10px; border-radius: 14px; flex: 1;">
+                                  <span style="font-weight: bold;">Marc (IT Support)</span> Trop stylée ! La plaque <b>LV-0409-SP</b> c'est un clin d'oeil à quoi ? 😉
+                                </div>
+                              </div>
+                              <div style="display: flex; gap: 8px;">
+                                <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=100&auto=format&fit=crop" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" />
+                                <div style="background: white; padding: 6px 10px; border-radius: 14px; flex: 1;">
+                                  <span style="font-weight: bold;">Julien Dupuis</span> Haha secret défense Marc ! 🤫
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <!-- Post 2 (EFREI Ad) -->
+                          <div style="background: white; border-radius: 8px; margin-top: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.1); overflow: hidden;">
+                            <div style="padding: 10px;">
+                              <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <img src="https://th.bing.com/th/id/OIP.zBbutjeuSjWRVnxDji5IegHaCa?w=312&h=114&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3" style="width: 40px; height: 40px; border-radius: 50%; object-fit: contain; background: white; border: 1px solid #ddd; margin-right: 12px;" />
+                                <div>
+                                  <div style="font-weight: 600;">EFREI Paris</div>
+                                  <div style="font-size: 12px; color: #65676b;">Sponsorisé · 🌍</div>
+                                </div>
+                              </div>
+                              <p style="margin: 0 0 8px; font-size: 14px;">Prêt à devenir un expert de la tech ? Rejoignez l'EFREI, la grande école du numérique ! 🚀 #EFREI #Cybersecurity #Tech</p>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1000&auto=format&fit=crop" style="width: 100%; max-height: 200px; object-fit: cover; display: block;">
+                          </div>
+
+                          <!-- Post 3 (Rocky) -->
+                          <div style="background: white; border-radius: 8px; margin-top: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.1); overflow: hidden;">
+                            <div style="padding: 10px;">
+                              <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=100&auto=format&fit=crop" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px;" />
+                                <div>
+                                  <div style="font-weight: 600;">Julien Dupuis</div>
+                                  <div style="font-size: 12px; color: #65676b;">15 janvier 2024 · 🌍</div>
+                                </div>
+                              </div>
+                              <p style="margin: 0 0 8px; font-size: 14px;"><b>${TARGET.security.dog}</b> me manque déjà... Hâte de le retrouver ce soir. 🐶❤️ #DogLover</p>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=80&w=1000&auto=format&fit=crop" style="width: 100%; max-height: 200px; object-fit: cover; display: block;">
+                          </div>
+                        </div>
+
+                        <!-- Right Sidebar -->
+                        <div style="flex: 0 0 220px;">
+                          <div style="font-weight: 600; color: #65676b; margin-bottom: 12px;">Contacts</div>
+                          <div style="display: flex; align-items: center; padding: 8px; border-radius: 8px;" class="fl-clickable">
+                            <div style="width: 32px; height: 32px; margin-right: 12px; position: relative;">
+                              <img src="https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?q=80&w=100&auto=format&fit=crop" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" />
+                              <div style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #31a24c; border: 2px solid white; border-radius: 50%;"></div>
+                            </div>
+                            <div style="font-size: 14px;">Marc (IT Support)</div>
+                          </div>
+                          <div style="display: flex; align-items: center; padding: 8px; border-radius: 8px;" class="fl-clickable">
+                            <div style="width: 32px; height: 32px; margin-right: 12px; position: relative;">
+                              <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100&auto=format&fit=crop" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" />
+                              <div style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #31a24c; border: 2px solid white; border-radius: 50%;"></div>
+                            </div>
+                            <div style="font-size: 14px;">Maman</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                } else if (route === "cloud") {
+                  if (STATE.flags.cloud_session) {
+                    setTimeout(() => Apps.Browser.go("win"), 200);
+                    return;
+                  }
+
+                  url.value = "https://clouddrive.secure/auth";
+                  view.innerHTML = `
+                    <div class="flex-center" style="min-height:100%; background:linear-gradient(135deg, #0ea5e9, #2563eb);">
+                      <div style="background:white; padding:26px; border-radius:12px; width:420px; text-align:center;">
+                        <div style="font-size:60px; margin-bottom:6px;">☁️</div>
+                        <h2 style="margin:0 0 6px;">CloudDrive</h2>
+                        <p style="color:#64748b; margin:0 0 18px;">Accès chiffré</p>
+                        <input id="cloud-input" type="password" placeholder="Mot de passe"
+                          style="width:100%; padding:14px; border:1px solid #e2e8f0; border-radius:10px; font-size:16px; margin-bottom:12px;">
+                        <button data-action="check-cloud"
+                          style="width:100%; padding:12px; border:0; border-radius:10px; background:#0f172a; color:white; font-weight:900; cursor:pointer;">
+                          Déchiffrer
+                        </button>
+                        <div style="margin-top:16px; font-size:13px;">
+                          <span style="color:#2563eb; cursor:pointer; text-decoration:underline;" data-action="go" data-route="cloud-recovery">Mot de passe oublié ?</span>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                } else if (route === "cloud-recovery") {
+                  url.value = "https://clouddrive.secure/recovery";
+                  view.innerHTML = `
+                    <div class="flex-center" style="min-height:100%; background:linear-gradient(135deg, #0ea5e9, #2563eb);">
+                      <div style="background:white; padding:26px; border-radius:12px; width:420px; text-align:center;">
+                        <h2 style="margin:0 0 15px;">Récupération de compte</h2>
+                        <p style="color:#64748b; margin:0 0 20px; font-size:13px;">Répondez aux questions de sécurité pour réinitialiser votre accès.</p>
+                        
+                        <div style="text-align:left; font-size:12px; color:#64748b; margin-bottom:4px;">Nom de votre premier animal de compagnie ?</div>
+                        <input id="sq-dog" type="text" placeholder="Réponse..." style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:15px;">
+
+                        <div style="text-align:left; font-size:12px; color:#64748b; margin-bottom:4px;">Destination de vos vacances 2023 ?</div>
+                        <input id="sq-place" type="text" placeholder="Réponse..." style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:20px;">
+
+                        <button data-action="check-security"
+                          style="width:100%; padding:12px; border:0; border-radius:10px; background:#0f172a; color:white; font-weight:900; cursor:pointer;">
+                          Valider les réponses
+                        </button>
+                        <div style="margin-top:15px;"><span style="font-size:12px; color:#64748b; cursor:pointer;" data-action="go" data-route="cloud">Retour</span></div>
+                      </div>
+                    </div>
+                  `;
+                } else if (route === "win") {
+                  url.value = "https://clouddrive.secure/files";
+
+                  view.innerHTML = `
+                    <div style="height:100%; background:#f8fafc; color:#1e293b; display:flex; flex-direction:column; font-family:Inter, sans-serif;">
+                      <div style="background:#fff; padding:15px 25px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                          <span style="font-size:24px;">☁️</span>
+                          <span style="font-weight:700; font-size:18px; color:#2563eb;">CloudDrive Personal</span>
+                        </div>
+                        <div style="font-size:12px; color:#64748b;">Espace utilisé : 1.2 Go / 15 Go</div>
+                      </div>
+
+                      <div style="padding:30px; flex:1; overflow-y:auto;">
+                        <div style="margin-bottom:20px; font-weight:600; font-size:14px; color:#64748b;">Fichiers récents</div>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:20px;">
+                          <div class="clickable" style="padding:20px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05);" onclick="Toast.show('Cloud','Fichier corrompu.','error')">
+                            <div style="font-size:48px; margin-bottom:10px;">📄</div>
+                            <div style="font-size:12px; font-weight:500;">contrat_travail.pdf</div>
+                          </div>
+                          
+                          <div class="clickable" data-action="open-cloud-pin" style="padding:20px; border:1px solid #2563eb; border-radius:12px; background:#eff6ff; text-align:center; box-shadow:0 4px 6px -1px rgba(37,99,235,0.1);">
+                            <div style="font-size:48px; margin-bottom:10px;">🔑</div>
+                            <div style="font-size:12px; font-weight:600; color:#1d4ed8;">mdp_passvault.txt</div>
+                            ${STATE.flags.cloud_pin_unlocked ? `<div style="margin-top:10px; font-weight:bold; color:#fff; background:#2563eb; padding:6px; border-radius:6px; font-size:14px;">${TARGET.platePin}</div>` : ''}
+                          </div>
+
+                          <div class="clickable" style="padding:20px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05);" onclick="Toast.show('Cloud','Fichier corrompu.','error')">
+                            <div style="font-size:48px; margin-bottom:10px;">📁</div>
+                            <div style="font-size:12px; font-weight:500;">RH_CONFIDENTIEL</div>
+                          </div>
+
+                          <div class="clickable" style="padding:20px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05);" onclick="Toast.show('Système','Accès refusé : Cryptage Quantum requis.','error')">
+                            <div style="font-size:48px; margin-bottom:10px;">🔐</div>
+                            <div style="font-size:12px; font-weight:500;">PROJET_SECRET_X</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style="padding:20px; text-align:center; border-top:1px solid #e2e8f0; background:#fff;">
+                        <button class="b-btn" style="width:auto; padding:10px 25px; background:#2563eb; color:#fff; font-weight:600; border:none; border-radius:8px;" data-action="go" data-route="home">
+                          REVENIR À L'ACCUEIL
+                        </button>
+                      </div>
+                    </div>
+                  `;
+                } else if (route === "ending-A") {
+                  url.value = "system://ending/A";
+                  view.innerHTML = `
+                    <div class="flex-center" style="min-height:100%; background:#0b1220; color:#e5e7eb; flex-direction:column; text-align:center; padding:30px; gap:10px;">
+                      <div style="font-size:46px; font-weight:900; color:#10b981;">FIN A</div>
+                      <div style="max-width:820px; opacity:.85; line-height:1.6;">
+                        Tu exposes la faille à la société. Merci.<br>
+                        Un <b>CPE</b> est signé et ton rapport devient un exemple interne.
+                      </div>
+                      <div style="font-family:JetBrains Mono; font-size:12px; opacity:.7; margin-top:8px;">
+                        localStorage.osintos_ending = "A"
+                      </div>
+                      <button class="b-btn" data-action="go" data-route="home">Retour</button>
+                    </div>
+                  `;
+                } else if (route === "ending-B") {
+                  url.value = "system://ending/B";
+                  view.innerHTML = `
+                    <div class="flex-center" style="min-height:100%; background:#111827; color:#e5e7eb; flex-direction:column; text-align:center; padding:30px; gap:10px;">
+                      <div style="font-size:50px; font-weight:900; color:#ef4444;">WANTED</div>
+                      <div style="max-width:820px; opacity:.9; line-height:1.6;">
+                        “Vente de base sur le darknet” — choix douteux détecté.<br>
+                        (Ceci est un écran humoristique, mais ton audit est archivé…)
+                      </div>
+                      <div style="font-family:JetBrains Mono; font-size:12px; opacity:.7; margin-top:8px;">
+                        localStorage.osintos_ending = "B"
+                      </div>
+                      <button class="b-btn" data-action="go" data-route="home">Retour</button>
+                    </div>
+                  `;
+                } else {
+                  // 404 personnalisé + indice subtil
+                  url.value = "https://start.page/404";
+                  view.innerHTML = `
+                    <div class="flex-center full-size" style="flex-direction:column; background:#0b1220; color:#e5e7eb; gap:10px; padding:30px;">
+                      <div style="font-size:46px; font-weight:900;">404</div>
+                      <div style="opacity:.8;">Chemin non autorisé.</div>
+                      <div style="font-size:12px; opacity:.6; max-width:720px; text-align:center;">
+                        Conseil: les “standards entreprise” réutilisent souvent un préfixe + un identifiant interne.
+                      </div>
+                      <button class="b-btn" data-action="go" data-route="home">Retour</button>
+                    </div>
+                  `;
+                }
+              }, 250);
+            },
+          },
+        };
+
+        // -------------------------------------------------------
+        // OS CORE
+        // -------------------------------------------------------
+        const OS = {
+          async boot() {
+            setFavicon(true);
+
+            const ending = localStorage.getItem("osintos_ending");
+            if (ending === "A" || ending === "B") {
+              STATE.flags.ending_choice = ending;
+            }
+
+            const log = $("#boot-log");
+            const lines = [
+              "SECURE BOOT... OK",
+              "KERNEL LOAD... OK",
+              "USER SESSION... LOCKED",
+              "FALLBACK ENTRYPOINT... AVAILABLE",
+              "UI READY.",
+            ];
+
+            for (const line of lines) {
+              const div = document.createElement("div");
+              div.className = "boot-line";
+              div.textContent = "> " + line;
+              log?.appendChild(div);
+              await sleep(320);
+            }
+
+            await sleep(650);
+            document.getElementById("boot-layer")?.classList.add("hidden");
+            document.getElementById("difficulty-layer").classList.remove("hidden");
+          },
+
+          selectDifficulty(mode) {
+            STATE.difficulty = mode;
+            document.getElementById("difficulty-layer").classList.add("hidden");
+            document.getElementById("login-layer").style.display = "flex";
+            OS.startTimer();
+          },
+
+          startTimer() {
+            if (STATE.flags.timerInterval) return;
+            STATE.flags.timerInterval = setInterval(() => {
+              STATE.flags.timeLeft--;
+              const min = Math.floor(STATE.flags.timeLeft / 60);
+              const sec = STATE.flags.timeLeft % 60;
+              const timeStr = `${min}:${sec.toString().padStart(2, '0')}`;
+              
+              document.querySelectorAll("#game-timer, #login-timer-display").forEach(el => {
+                el.textContent = timeStr;
+              });
+
+            const batteryPercent = Math.max(0, Math.floor((STATE.flags.timeLeft / 900) * 84));
+            const batteryEl = document.getElementById("battery-display");
+            if (batteryEl) batteryEl.textContent = `🔋 ${batteryPercent}%`;
+
+              if (STATE.flags.timeLeft <= 0) {
+                OS.fail();
+              }
+            }, 1000);
+          },
+
+          fail() {
+            clearInterval(STATE.flags.timerInterval);
+            document.getElementById("desktop").classList.add("hidden");
+            document.getElementById("login-layer").style.display = "none";
+            document.getElementById("win-screen").classList.add("hidden");
+            document.getElementById("fail-screen").classList.remove("hidden");
+          },
+
+          bypassLogin() {
+            setTimeout(() => {
+              document.getElementById("login-layer").style.display = "none";
+              document.getElementById("desktop").classList.remove("hidden");
+              OS.loadDesktop();
+
+              MissionControl.complete("start");
+              Toast.show(
+                "Accès",
+                "Session invité ouverte (droits limités).",
+                "warning",
+              );
+
+              Story.onMissionChange();
+            }, 650);
+          },
+
+          updateClock() {
+            const now = new Date();
+            const el = document.getElementById("clock");
+            if (!el) return;
+            el.textContent = now.toLocaleTimeString("fr-FR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          },
+
+          loadDesktop() {
+            const icons = [
+              { name: "Finder", icon: "📂", action: "finder" },
+              { name: "Mail", icon: "📧", action: "mail" },
+              { name: "Navigateur", icon: "🌐", action: "browser" },
+              { name: "PassVault", icon: "🔐", action: "vault" },
+            ];
+
+            document.getElementById("icon-grid").innerHTML = icons
+              .map(
+                (i) => `
+              <div class="desktop-icon" data-action="launch" data-app="${i.action}">
+                <div class="di-img">${i.icon}</div>
+                <div class="di-label">${escapeHtml(i.name)}</div>
+              </div>`,
+              )
+              .join("");
+
+            const dockItems = [
+              { name: "Finder", icon: "📂", action: "finder" },
+              { name: "Mail", icon: "📧", action: "mail" },
+              { name: "Browser", icon: "🌐", action: "browser" },
+              { name: "Vault", icon: "🔐", action: "vault" },
+            ];
+
+            document.getElementById("dock").innerHTML = dockItems
+              .map(
+                (d) => `
+              <div class="dock-app" id="dock-${d.action}" title="${escapeHtml(
+                d.name,
+              )}" data-action="launch" data-app="${d.action}">${d.icon}</div>`,
+              )
+              .join("");
+
+            if (STATE.difficulty === 'normal') {
+              setTimeout(
+                () => document.getElementById("mission-hud")?.classList.add("active"),
+                600,
+              );
+            }
+            Story.onMissionChange();
+          },
+
+          init() {
+            OS.boot();
+            OS.updateClock();
+            setInterval(OS.updateClock, 1000);
+
+            document.getElementById("btn-guest")?.addEventListener("click", OS.bypassLogin);
+
+            document.getElementById("btn-diff-easy")?.addEventListener("click", () => OS.selectDifficulty('normal'));
+            document.getElementById("btn-diff-hard")?.addEventListener("click", () => OS.selectDifficulty('expert'));
+
+            const toggleBtn = document.getElementById("toggle-intro");
+            const introText = document.getElementById("mission-intro-text");
+            toggleBtn?.addEventListener("click", () => {
+              introText.classList.toggle("hidden");
+            });
+
+            document.getElementById("btn-logout")?.addEventListener("click", () => {
+              document.getElementById("desktop").classList.add("hidden");
+              document.getElementById("login-layer").style.display = "flex";
+            });
+
+            document.getElementById("btn-win-back")?.addEventListener("click", () => {
+              document.getElementById("win-screen").classList.add("hidden");
+              document.getElementById("login-layer").style.display = "flex";
+            });
+
+            const loginBtn = document.getElementById("btn-login-submit");
+            loginBtn?.addEventListener("click", () => {
+              const user = document.getElementById("login-user").value;
+              const pass = document.getElementById("login-pass").value;
+              
+              if (user.toUpperCase() === "INGENIEUR" + TARGET.badgeNumber && pass === TARGET.winPass) {
+                clearInterval(STATE.flags.timerInterval);
+                document.getElementById("login-layer").style.display = "none";
+                document.getElementById("win-screen").classList.remove("hidden");
+              } else {
+                Toast.show("Erreur", "Identifiants incorrects.", "error");
+              }
+            });
+          },
+        };
+
+        // -------------------------------------------------------
+        // EVENT DELEGATION (une seule fois)
+        // -------------------------------------------------------
+        document.addEventListener("click", async (e) => {
+          const launch = e.target?.closest?.('[data-action="launch"]');
+          if (launch) {
+            const app = launch.getAttribute("data-app");
+            if (app) Apps.launch(app);
+            return;
+          }
+
+          const toggleHints = e.target?.closest?.('#btn-toggle-hints');
+          if (toggleHints) {
+            const brief = $("#mission-brief");
+            if (brief) {
+              brief.classList.toggle("hidden");
+              toggleHints.textContent = brief.classList.contains("hidden") ? "Afficher" : "Masquer";
+            }
+            return;
+          }
+
+          const getHint = e.target?.closest?.('[data-action="get-hint"]');
+          if (getHint) {
+            const level = getHint.getAttribute("data-level");
+            Story.updateHint(level);
+            Toast.show("Indices", "Analyse mise à jour.", "info");
+            return;
+          }
+
+          const openFile = e.target?.closest?.('[data-action="open-file"]');
+          if (openFile) {
+            const id = openFile.getAttribute("data-file-id");
+            const f = FILES.find((x) => x.id === id);
+            if (!f) return Toast.show("Finder", "Fichier introuvable.", "error");
+
+            if (f.type === "text") {
+              const html = `<textarea style="width:100%; height:100%; background:#0b1220; color:#e5e7eb; padding:18px; border:none; resize:none; font-family:'JetBrains Mono'; font-size:12px;">${escapeHtml(
+                f.content || "",
+              )}</textarea>`;
+              WindowManager.create(`txt-${id}`, f.name, html, 740, 540);
+            }
+
+            if (f.type === "cv") {
+              const html = `
+                <div style="background:#f3f4f6; padding:40px; height:100%; overflow-y:auto; color:#1f2937; font-family:serif;">
+                  <div style="background:white; max-width:600px; margin:0 auto; padding:50px; box-shadow:0 10px 25px rgba(0,0,0,0.1); min-height:800px;">
+                    <h1 style="margin:0; font-size:28px; border-bottom:2px solid #1877f2; padding-bottom:10px;">JULIEN DUPUIS</h1>
+                    <p style="font-style:italic; color:#6b7280; margin-top:5px;">Expert en Cybersécurité & Investigation Numérique</p>
+                    
+                    <div style="margin-top:30px;">
+                      <h3 style="color:#1877f2; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Expériences Professionnelles</h3>
+                      <div style="margin-top:15px;">
+                        <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>Ingénieur Cybersécurité</span><span>2022 - Présent</span></div>
+                        <div style="font-size:13px; color:#4b5563;">TechCorp HQ - Paris</div>
+                      </div>
+                      <div style="margin-top:15px;">
+                        <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>Vendeur High-Tech</span><span>2020 - 2022</span></div>
+                        <div style="font-size:13px; color:#4b5563;">Fnac Lyon - Part-Dieu</div>
+                      </div>
+                    </div>
+
+                    <div style="margin-top:30px;">
+                      <h3 style="color:#1877f2; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Compétences</h3>
+                      <ul style="font-size:13px; margin-top:10px; padding-left:20px; color:#4b5563;">
+                        <li>Analyse de vulnérabilités & Pentest</li>
+                        <li>Sécurisation d'infrastructures Cloud</li>
+                        <li>Forensics & Réponse aux incidents</li>
+                      </ul>
+                    </div>
+
+                    <div style="margin-top:30px;">
+                      <h3 style="color:#1877f2; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Informations Complémentaires</h3>
+                      <p style="font-size:13px; margin-top:10px;"><b>Badge Employé :</b> ${TARGET.badgeNumber}</p>
+                      <p style="font-size:13px;"><b>Formation :</b> EFREI Paris (Promotion 2019)</p>
+                      <p style="font-size:13px;"><b>Langues :</b> Anglais (C1), Espagnol (B2)</p>
+                    </div>
+                  </div>
+                </div>
+              `;
+              WindowManager.create(`cv-${id}`, f.name, html, 800, 700);
+            }
+            return;
+          }
+
+          const mailFolder = e.target?.closest?.('[data-action="mail-folder"]');
+          if (mailFolder) {
+            Apps.Mail.folder = mailFolder.getAttribute("data-folder") || "inbox";
+            
+            // Mise à jour visuelle de l'état actif (couleur bleue)
+            const win = mailFolder.closest('.window');
+            if (win) {
+              win.querySelectorAll('.m-folder').forEach(el => el.classList.remove('active'));
+              mailFolder.classList.add('active');
+            }
+            
+            Apps.Mail.renderList();
+            return;
+          }
+
+          const openMail = e.target?.closest?.('[data-action="open-mail"]');
+          if (openMail) {
+            Apps.Mail.read(openMail.getAttribute("data-mail-id"));
+            return;
+          }
+
+          const vaultHint = e.target?.closest?.('[data-action="vault-hint"]');
+          if (vaultHint) {
+            Toast.show("Indice", "Un code court se cache souvent dans un souvenir.", "info");
+            return;
+          }
+
+          const vaultUnlock = e.target?.closest?.('[data-action="vault-unlock"]');
+          if (vaultUnlock) {
+            Apps.PassVault.unlock();
+            return;
+          }
+
+          const vaultDetail = e.target?.closest?.('[data-action="vault-detail"]');
+          if (vaultDetail) {
+            const site = vaultDetail.getAttribute("data-site");
+            if (site) Apps.PassVault.detail(site);
+            return;
+          }
+
+          const copy = e.target?.closest?.('[data-action="copy"]');
+          if (copy) {
+            const text = copy.getAttribute("data-copy") || "";
+            try {
+              await navigator.clipboard.writeText(text);
+              Toast.show("Copié", "OK", "info");
+            } catch {
+              Toast.show("Copie", "Impossible de copier.", "warning");
+            }
+            return;
+          }
+
+          const go = e.target?.closest?.('[data-action="go"]');
+          if (go) {
+            const route = go.getAttribute("data-route");
+            const win = go.closest('.window');
+            if (route && win) Apps.Browser.go(route, win);
+            return;
+          }
+
+          const reload = e.target?.closest?.('[data-action="reload"]');
+          if (reload) {
+            const win = reload.closest('.window');
+            if (win && win.dataset.lastRoute) Apps.Browser.go(win.dataset.lastRoute, win);
+            return;
+          }
+
+          const launchNewBrowser = e.target?.closest?.('[data-action="launch-new-browser"]');
+          if (launchNewBrowser) {
+            Apps.Browser.open(true);
+            return;
+          }
+
+          const checkFacelookLogin = e.target?.closest?.('[data-action="check-facelook-login"]');
+          if (checkFacelookLogin) {
+            const win = checkFacelookLogin.closest('.window');
+            const user = win.querySelector("#fl-user")?.value?.trim() || "";
+            const pass = win.querySelector("#fl-pass")?.value?.trim() || "";
+            
+            if (user === "julien.d@mail.com" && pass === "Juju" + randomYear) {
+              STATE.flags.facelook_session = true;
+              Toast.show("FaceLook", "Connexion réussie.", "success");
+              Apps.Browser.go("facelook-feed", win);
+              Story.onMissionChange();
+            } else {
+              Toast.show("FaceLook", "Identifiants incorrects.", "error");
+            }
+            return;
+          }
+
+          const checkFacelook = e.target?.closest?.('[data-action="check-facelook-recovery"]');
+          if (checkFacelook) {
+            const win = checkFacelook.closest('.window');
+            const dob = win.querySelector("#recovery-dob")?.value?.trim() || "";
+            const city = win.querySelector("#recovery-city")?.value?.trim() || "";
+            if (dob === TARGET.birth.date && city.toLowerCase() === TARGET.birth.city.toLowerCase()) {
+              STATE.flags.facelook_recovery_sent = true;
+              Toast.show("FaceLook", "Identité confirmée. Un email a été envoyé.", "success");
+              Apps.Browser.go("facelook", win);
+              Story.onMissionChange();
+            } else {
+              Toast.show("FaceLook", "Informations incorrectes.", "error");
+            }
+            return;
+          }
+
+          const checkCloud = e.target?.closest?.('[data-action="check-cloud"]');
+          if (checkCloud) {
+            const win = checkCloud.closest('.window');
+            const pass = win.querySelector("#cloud-input")?.value?.trim() || "";
+
+            if (pass === TARGET.cloudPass) {
+              STATE.flags.cloud_session = true;
+              MissionControl.complete("cloud");
+              Toast.show("CloudDrive", "Déchiffrement réussi.", "success");
+              Apps.Browser.go("win", win);
+            } else {
+              Toast.show("CloudDrive", "Mot de passe incorrect.", "error");
+            }
+            return;
+          }
+
+          const openCloudPin = e.target?.closest?.('[data-action="open-cloud-pin"]');
+          if (openCloudPin) {
+            if (STATE.flags.cloud_pin_unlocked) return;
+            
+            const win = openCloudPin.closest('.window');
+            const answer = prompt("VÉRIFICATION DE SÉCURITÉ :\nQuel était mon métier en 2020 ?");
+            if (answer && answer.toLowerCase().includes("vendeur")) {
+              STATE.flags.cloud_pin_unlocked = true;
+              Toast.show("Cloud", "Accès autorisé au fichier.", "success");
+              Apps.Browser.go("win", win); // Refresh view
+              Story.onMissionChange();
+            } else if (answer !== null) {
+              Toast.show("Cloud", "Réponse incorrecte.", "error");
+            }
+            return;
+          }
+
+          const checkSecurity = e.target?.closest?.('[data-action="check-security"]');
+          if (checkSecurity) {
+            const win = checkSecurity.closest('.window');
+            const dog = win.querySelector("#sq-dog")?.value?.trim() || "";
+            const place = win.querySelector("#sq-place")?.value?.trim() || "";
+
+            if (
+              dog.toLowerCase() === TARGET.security.dog.toLowerCase() &&
+              place.toLowerCase() === TARGET.security.place.toLowerCase()
+            ) {
+              STATE.flags.cloud_session = true;
+              MissionControl.complete("cloud_recovery");
+              MissionControl.complete("cloud");
+              Toast.show("CloudDrive", "Identité confirmée. Mot de passe réinitialisé.", "success");
+              Apps.Browser.go("win", win);
+              Story.onMissionChange();
+            } else {
+              Toast.show("Sécurité", "Réponses incorrectes. Réessayez.", "error");
+            }
+            return;
+          }
+
+          const ending = e.target?.closest?.('[data-action="ending"]');
+          if (ending) {
+            const choice = ending.getAttribute("data-choice");
+            if (!choice) return;
+            const win = ending.closest('.window');
+
+            localStorage.setItem("osintos_ending", choice);
+            STATE.flags.ending_choice = choice;
+
+            if (choice === "A") {
+              Toast.show(
+                "Fin A",
+                "Divulgation responsable. CPE en préparation…",
+                "success",
+              );
+              Apps.Browser.go("ending-A", win);
+            } else {
+              Toast.show("Fin B", "Choix risqué…", "warning");
+              Apps.Browser.go("ending-B", win);
+            }
+            return;
+          }
+        });
+
+        // -------------------------------------------------------
+        // INITIALISATION DU SYSTÈME
+        // -------------------------------------------------------
+        document.addEventListener("DOMContentLoaded", OS.init);
+      })();
+    </script>
+  </body>
+</html>
