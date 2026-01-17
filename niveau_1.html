@@ -2278,14 +2278,13 @@
         // EVENT DELEGATION (une seule fois)
         // -------------------------------------------------------
         document.addEventListener("click", async (e) => {
-          const launch = e.target?.closest?.('[data-action="launch"]');
-          if (launch) {
-            const app = launch.getAttribute("data-app");
-            if (app) Apps.launch(app);
-            return;
-          }
+          // Sécurisation de la cible (gestion des noeuds de texte)
+          let target = e.target;
+          if (target.nodeType === 3) target = target.parentNode;
+          if (!target || !target.closest) return;
 
-          const toggleHints = e.target?.closest?.('#btn-toggle-hints');
+          // 1. Gestion du bouton d'indices
+          const toggleHints = target.closest('#btn-toggle-hints');
           if (toggleHints) {
             const brief = $("#mission-brief");
             if (brief) {
@@ -2295,251 +2294,172 @@
             return;
           }
 
-          const getHint = e.target?.closest?.('[data-action="get-hint"]');
-          if (getHint) {
-            const level = getHint.getAttribute("data-level");
-            Story.updateHint(level);
-            Toast.show("Indices", "Analyse mise à jour.", "info");
-            return;
-          }
+          // 2. Gestion des actions génériques
+          const actionEl = target.closest('[data-action]');
+          if (!actionEl) return;
 
-          const openFile = e.target?.closest?.('[data-action="open-file"]');
-          if (openFile) {
-            const id = openFile.getAttribute("data-file-id");
-            const f = FILES.find((x) => x.id === id);
-            if (!f) return Toast.show("Finder", "Fichier introuvable.", "error");
+          const action = actionEl.getAttribute("data-action");
+          
+          // Définition des actions
+          const actions = {
+            launch: (el) => Apps.launch(el.getAttribute("data-app")),
+            
+            "get-hint": (el) => {
+              Story.updateHint(el.getAttribute("data-level"));
+              Toast.show("Indices", "Analyse mise à jour.", "info");
+            },
 
-            if (f.type === "text") {
-              const html = `<textarea style="width:100%; height:100%; background:#0b1220; color:#e5e7eb; padding:18px; border:none; resize:none; font-family:'JetBrains Mono'; font-size:12px;">${escapeHtml(
-                f.content || "",
-              )}</textarea>`;
-              WindowManager.create(`txt-${id}`, f.name, html, 740, 540);
-            }
+            "open-file": (el) => {
+              const id = el.getAttribute("data-file-id");
+              const f = FILES.find((x) => x.id === id);
+              if (!f) return Toast.show("Finder", "Fichier introuvable.", "error");
 
-            if (f.type === "cv") {
-              const html = `
-                <div style="background:#f3f4f6; padding:40px; height:100%; overflow-y:auto; color:#1f2937; font-family:serif;">
+              if (f.type === "text") {
+                const html = `<textarea style="width:100%; height:100%; background:#0b1220; color:#e5e7eb; padding:18px; border:none; resize:none; font-family:'JetBrains Mono'; font-size:12px;">${escapeHtml(f.content || "")}</textarea>`;
+                WindowManager.create(`txt-${id}`, f.name, html, 740, 540);
+              } else if (f.type === "cv") {
+                const html = `<div style="background:#f3f4f6; padding:40px; height:100%; overflow-y:auto; color:#1f2937; font-family:serif;">
                   <div style="background:white; max-width:600px; margin:0 auto; padding:50px; box-shadow:0 10px 25px rgba(0,0,0,0.1); min-height:800px;">
                     <h1 style="margin:0; font-size:28px; border-bottom:2px solid #1877f2; padding-bottom:10px;">JULIEN DUPUIS</h1>
-                    <p style="font-style:italic; color:#6b7280; margin-top:5px;">Expert en Cybersécurité & Investigation Numérique</p>
-                    
-                    <div style="margin-top:30px;">
-                      <h3 style="color:#1877f2; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Expériences Professionnelles</h3>
-                      <div style="margin-top:15px;">
-                        <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>Ingénieur Cybersécurité</span><span>2022 - Présent</span></div>
-                        <div style="font-size:13px; color:#4b5563;">TechCorp HQ - Paris</div>
-                      </div>
-                      <div style="margin-top:15px;">
-                        <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>Vendeur High-Tech</span><span>2020 - 2022</span></div>
-                        <div style="font-size:13px; color:#4b5563;">Fnac Lyon - Part-Dieu</div>
-                      </div>
-                    </div>
+                    <p>CV Contenu...</p>
+                    <p style="font-size:13px; margin-top:10px;"><b>Badge Employé :</b> ${TARGET.badgeNumber}</p>
+                  </div></div>`;
+                WindowManager.create(`cv-${id}`, f.name, html, 800, 700);
+              }
+            },
 
-                    <div style="margin-top:30px;">
-                      <h3 style="color:#1877f2; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Compétences</h3>
-                      <ul style="font-size:13px; margin-top:10px; padding-left:20px; color:#4b5563;">
-                        <li>Analyse de vulnérabilités & Pentest</li>
-                        <li>Sécurisation d'infrastructures Cloud</li>
-                        <li>Forensics & Réponse aux incidents</li>
-                      </ul>
-                    </div>
+            "mail-folder": (el) => {
+              Apps.Mail.folder = el.getAttribute("data-folder") || "inbox";
+              const win = el.closest('.window');
+              if (win) {
+                win.querySelectorAll('.m-folder').forEach(e => e.classList.remove('active'));
+                el.classList.add('active');
+              }
+              Apps.Mail.renderList();
+            },
 
-                    <div style="margin-top:30px;">
-                      <h3 style="color:#1877f2; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Informations Complémentaires</h3>
-                      <p style="font-size:13px; margin-top:10px;"><b>Badge Employé :</b> ${TARGET.badgeNumber}</p>
-                      <p style="font-size:13px;"><b>Formation :</b> EFREI Paris (Promotion 2019)</p>
-                      <p style="font-size:13px;"><b>Langues :</b> Anglais (C1), Espagnol (B2)</p>
-                    </div>
-                  </div>
-                </div>
-              `;
-              WindowManager.create(`cv-${id}`, f.name, html, 800, 700);
-            }
-            return;
-          }
-
-          const mailFolder = e.target?.closest?.('[data-action="mail-folder"]');
-          if (mailFolder) {
-            Apps.Mail.folder = mailFolder.getAttribute("data-folder") || "inbox";
+            "open-mail": (el) => Apps.Mail.read(el.getAttribute("data-mail-id")),
+            "vault-hint": () => Toast.show("Indice", "Un code court se cache souvent dans un souvenir.", "info"),
+            "vault-unlock": () => Apps.PassVault.unlock(),
+            "vault-detail": (el) => Apps.PassVault.detail(el.getAttribute("data-site")),
             
-            // Mise à jour visuelle de l'état actif (couleur bleue)
-            const win = mailFolder.closest('.window');
-            if (win) {
-              win.querySelectorAll('.m-folder').forEach(el => el.classList.remove('active'));
-              mailFolder.classList.add('active');
-            }
+            copy: async (el) => {
+              try {
+                await navigator.clipboard.writeText(el.getAttribute("data-copy") || "");
+                Toast.show("Copié", "OK", "info");
+              } catch { Toast.show("Copie", "Impossible de copier.", "warning"); }
+            },
+
+            go: (el) => {
+              const win = el.closest('.window');
+              if (win) Apps.Browser.go(el.getAttribute("data-route"), win);
+            },
             
-            Apps.Mail.renderList();
-            return;
-          }
+            reload: (el) => {
+              const win = el.closest('.window');
+              if (win && win.dataset.lastRoute) Apps.Browser.go(win.dataset.lastRoute, win);
+            },
 
-          const openMail = e.target?.closest?.('[data-action="open-mail"]');
-          if (openMail) {
-            Apps.Mail.read(openMail.getAttribute("data-mail-id"));
-            return;
-          }
+            "launch-new-browser": () => Apps.Browser.open(true),
 
-          const vaultHint = e.target?.closest?.('[data-action="vault-hint"]');
-          if (vaultHint) {
-            Toast.show("Indice", "Un code court se cache souvent dans un souvenir.", "info");
-            return;
-          }
+            "check-facelook-login": (el) => {
+              const win = el.closest('.window');
+              const user = win.querySelector("#fl-user")?.value?.trim() || "";
+              const pass = win.querySelector("#fl-pass")?.value?.trim() || "";
+              
+              if (user === "julien.d@mail.com" && pass === "Juju" + randomYear) {
+                STATE.flags.facelook_session = true;
+                Toast.show("FaceLook", "Connexion réussie.", "success");
+                Apps.Browser.go("facelook-feed", win);
+                Story.onMissionChange();
+              } else {
+                Toast.show("FaceLook", "Identifiants incorrects.", "error");
+              }
+            },
 
-          const vaultUnlock = e.target?.closest?.('[data-action="vault-unlock"]');
-          if (vaultUnlock) {
-            Apps.PassVault.unlock();
-            return;
-          }
+            "check-facelook-recovery": (el) => {
+              const win = el.closest('.window');
+              const dob = win.querySelector("#recovery-dob")?.value?.trim() || "";
+              const city = win.querySelector("#recovery-city")?.value?.trim() || "";
+              if (dob === TARGET.birth.date && city.toLowerCase() === TARGET.birth.city.toLowerCase()) {
+                STATE.flags.facelook_recovery_sent = true;
+                Toast.show("FaceLook", "Identité confirmée. Un email a été envoyé.", "success");
+                Apps.Browser.go("facelook", win);
+                Story.onMissionChange();
+              } else {
+                Toast.show("FaceLook", "Informations incorrectes.", "error");
+              }
+            },
 
-          const vaultDetail = e.target?.closest?.('[data-action="vault-detail"]');
-          if (vaultDetail) {
-            const site = vaultDetail.getAttribute("data-site");
-            if (site) Apps.PassVault.detail(site);
-            return;
-          }
+            "check-cloud": (el) => {
+              const win = el.closest('.window');
+              const pass = win.querySelector("#cloud-input")?.value?.trim() || "";
 
-          const copy = e.target?.closest?.('[data-action="copy"]');
-          if (copy) {
-            const text = copy.getAttribute("data-copy") || "";
-            try {
-              await navigator.clipboard.writeText(text);
-              Toast.show("Copié", "OK", "info");
-            } catch {
-              Toast.show("Copie", "Impossible de copier.", "warning");
+              if (pass === TARGET.cloudPass) {
+                STATE.flags.cloud_session = true;
+                MissionControl.complete("cloud");
+                Toast.show("CloudDrive", "Déchiffrement réussi.", "success");
+                Apps.Browser.go("win", win);
+              } else {
+                Toast.show("CloudDrive", "Mot de passe incorrect.", "error");
+              }
+            },
+
+            "open-cloud-pin": (el) => {
+              if (STATE.flags.cloud_pin_unlocked) return;
+              const win = el.closest('.window');
+              const answer = prompt("VÉRIFICATION DE SÉCURITÉ :\nQuel était mon métier en 2020 ?");
+              if (answer && answer.toLowerCase().includes("vendeur")) {
+                STATE.flags.cloud_pin_unlocked = true;
+                Toast.show("Cloud", "Accès autorisé au fichier.", "success");
+                Apps.Browser.go("win", win);
+                Story.onMissionChange();
+              } else if (answer !== null) {
+                Toast.show("Cloud", "Réponse incorrecte.", "error");
+              }
+            },
+
+            "check-security": (el) => {
+              const win = el.closest('.window');
+              const dog = win.querySelector("#sq-dog")?.value?.trim() || "";
+              const place = win.querySelector("#sq-place")?.value?.trim() || "";
+
+              if (
+                dog.toLowerCase() === TARGET.security.dog.toLowerCase() &&
+                place.toLowerCase() === TARGET.security.place.toLowerCase()
+              ) {
+                STATE.flags.cloud_session = true;
+                MissionControl.complete("cloud_recovery");
+                MissionControl.complete("cloud");
+                Toast.show("CloudDrive", "Identité confirmée. Mot de passe réinitialisé.", "success");
+                Apps.Browser.go("win", win);
+                Story.onMissionChange();
+              } else {
+                Toast.show("Sécurité", "Réponses incorrectes. Réessayez.", "error");
+              }
+            },
+
+            ending: (el) => {
+              const choice = el.getAttribute("data-choice");
+              if (!choice) return;
+              const win = el.closest('.window');
+
+              localStorage.setItem("osintos_ending", choice);
+              STATE.flags.ending_choice = choice;
+
+              if (choice === "A") {
+                Toast.show("Fin A", "Divulgation responsable. CPE en préparation…", "success");
+                Apps.Browser.go("ending-A", win);
+              } else {
+                Toast.show("Fin B", "Choix risqué…", "warning");
+                Apps.Browser.go("ending-B", win);
+              }
             }
-            return;
-          }
+          };
 
-          const go = e.target?.closest?.('[data-action="go"]');
-          if (go) {
-            const route = go.getAttribute("data-route");
-            const win = go.closest('.window');
-            if (route && win) Apps.Browser.go(route, win);
-            return;
-          }
-
-          const reload = e.target?.closest?.('[data-action="reload"]');
-          if (reload) {
-            const win = reload.closest('.window');
-            if (win && win.dataset.lastRoute) Apps.Browser.go(win.dataset.lastRoute, win);
-            return;
-          }
-
-          const launchNewBrowser = e.target?.closest?.('[data-action="launch-new-browser"]');
-          if (launchNewBrowser) {
-            Apps.Browser.open(true);
-            return;
-          }
-
-          const checkFacelookLogin = e.target?.closest?.('[data-action="check-facelook-login"]');
-          if (checkFacelookLogin) {
-            const win = checkFacelookLogin.closest('.window');
-            const user = win.querySelector("#fl-user")?.value?.trim() || "";
-            const pass = win.querySelector("#fl-pass")?.value?.trim() || "";
-            
-            if (user === "julien.d@mail.com" && pass === "Juju" + randomYear) {
-              STATE.flags.facelook_session = true;
-              Toast.show("FaceLook", "Connexion réussie.", "success");
-              Apps.Browser.go("facelook-feed", win);
-              Story.onMissionChange();
-            } else {
-              Toast.show("FaceLook", "Identifiants incorrects.", "error");
-            }
-            return;
-          }
-
-          const checkFacelook = e.target?.closest?.('[data-action="check-facelook-recovery"]');
-          if (checkFacelook) {
-            const win = checkFacelook.closest('.window');
-            const dob = win.querySelector("#recovery-dob")?.value?.trim() || "";
-            const city = win.querySelector("#recovery-city")?.value?.trim() || "";
-            if (dob === TARGET.birth.date && city.toLowerCase() === TARGET.birth.city.toLowerCase()) {
-              STATE.flags.facelook_recovery_sent = true;
-              Toast.show("FaceLook", "Identité confirmée. Un email a été envoyé.", "success");
-              Apps.Browser.go("facelook", win);
-              Story.onMissionChange();
-            } else {
-              Toast.show("FaceLook", "Informations incorrectes.", "error");
-            }
-            return;
-          }
-
-          const checkCloud = e.target?.closest?.('[data-action="check-cloud"]');
-          if (checkCloud) {
-            const win = checkCloud.closest('.window');
-            const pass = win.querySelector("#cloud-input")?.value?.trim() || "";
-
-            if (pass === TARGET.cloudPass) {
-              STATE.flags.cloud_session = true;
-              MissionControl.complete("cloud");
-              Toast.show("CloudDrive", "Déchiffrement réussi.", "success");
-              Apps.Browser.go("win", win);
-            } else {
-              Toast.show("CloudDrive", "Mot de passe incorrect.", "error");
-            }
-            return;
-          }
-
-          const openCloudPin = e.target?.closest?.('[data-action="open-cloud-pin"]');
-          if (openCloudPin) {
-            if (STATE.flags.cloud_pin_unlocked) return;
-            
-            const win = openCloudPin.closest('.window');
-            const answer = prompt("VÉRIFICATION DE SÉCURITÉ :\nQuel était mon métier en 2020 ?");
-            if (answer && answer.toLowerCase().includes("vendeur")) {
-              STATE.flags.cloud_pin_unlocked = true;
-              Toast.show("Cloud", "Accès autorisé au fichier.", "success");
-              Apps.Browser.go("win", win); // Refresh view
-              Story.onMissionChange();
-            } else if (answer !== null) {
-              Toast.show("Cloud", "Réponse incorrecte.", "error");
-            }
-            return;
-          }
-
-          const checkSecurity = e.target?.closest?.('[data-action="check-security"]');
-          if (checkSecurity) {
-            const win = checkSecurity.closest('.window');
-            const dog = win.querySelector("#sq-dog")?.value?.trim() || "";
-            const place = win.querySelector("#sq-place")?.value?.trim() || "";
-
-            if (
-              dog.toLowerCase() === TARGET.security.dog.toLowerCase() &&
-              place.toLowerCase() === TARGET.security.place.toLowerCase()
-            ) {
-              STATE.flags.cloud_session = true;
-              MissionControl.complete("cloud_recovery");
-              MissionControl.complete("cloud");
-              Toast.show("CloudDrive", "Identité confirmée. Mot de passe réinitialisé.", "success");
-              Apps.Browser.go("win", win);
-              Story.onMissionChange();
-            } else {
-              Toast.show("Sécurité", "Réponses incorrectes. Réessayez.", "error");
-            }
-            return;
-          }
-
-          const ending = e.target?.closest?.('[data-action="ending"]');
-          if (ending) {
-            const choice = ending.getAttribute("data-choice");
-            if (!choice) return;
-            const win = ending.closest('.window');
-
-            localStorage.setItem("osintos_ending", choice);
-            STATE.flags.ending_choice = choice;
-
-            if (choice === "A") {
-              Toast.show(
-                "Fin A",
-                "Divulgation responsable. CPE en préparation…",
-                "success",
-              );
-              Apps.Browser.go("ending-A", win);
-            } else {
-              Toast.show("Fin B", "Choix risqué…", "warning");
-              Apps.Browser.go("ending-B", win);
-            }
-            return;
+          // Exécution de l'action
+          if (actions[action]) {
+            await actionsaction;
           }
         });
 
