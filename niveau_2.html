@@ -145,6 +145,50 @@
       .term-input { background: transparent; border: none; color: #fff; flex: 1; outline: none; font-family: inherit; font-size: inherit; }
       .term-progress { width: 100%; background: #333; height: 10px; margin-top: 5px; display: none; }
       .term-bar { height: 100%; background: #10b981; width: 0%; transition: width 0.2s; }
+
+      /* PHOTO VIEWER (from Lvl 1, adapted) */
+      .app-photos {
+        display: flex;
+        height: 100%;
+        background: #111;
+        color: #eee;
+      }
+      .p-canvas {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(#222 1px, transparent 1px);
+        background-size: 30px 30px;
+      }
+      .p-sidebar {
+        width: 300px;
+        background: #1a1a1a;
+        border-left: 1px solid #333;
+        padding: 20px;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+      }
+      .p-meta-row { margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+      .p-meta-lbl { color: #666; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; display: block; font-size: 10px; }
+      .btn-scan {
+        margin-top: auto; width: 100%; padding: 12px;
+        background: linear-gradient(135deg, var(--color-accent), #a78bfa);
+        border: none; color: white; font-weight: 900; cursor: pointer; border-radius: 10px;
+      }
+      .btn-scan[disabled] { opacity: 0.5; cursor: wait; }
+      
+      /* NEW: Image Thumbnails & Loading Effect */
+      .file-thumb { width: 100%; height: 60px; object-fit: cover; border-radius: 4px; margin-bottom: 5px; background: #222; }
+      .img-scan-load {
+        clip-path: inset(0 0 100% 0);
+        animation: scanLoad 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      @keyframes scanLoad { to { clip-path: inset(0 0 0 0); } }
+
     </style>
   </head>
 
@@ -353,9 +397,9 @@
         const Story = {
           hints: {
             step1: { // Archive
-              l1: "Le fichier 'Finance_2024.zip' semble important mais il est verrouillé.",
-               l2: "Le fichier 'todo_urgent.txt' renvoie vers 'secure_notes.dat'. Ce fichier semble chiffré.",
-               l3: "Utilisez le Terminal. Tapez 'decrypt secure_notes.dat' pour obtenir la date du mariage et l'IBAN de secours."
+              l1: "Le fichier 'Finance_2024.zip' est verrouillé. Le mot de passe est une date.",
+              l2: "Triez le dossier 'Photos_Vacances' avec la commande 'sort'. Cherchez une photo-indice dans le dossier 'Mariage_Trie'.",
+              l3: "Ouvrez la photo de l'alliance ('IMG_Sophie_Alliance.jpg') et scannez ses métadonnées pour trouver la date : 12/05/2018. Le mot de passe est 12052018."
             },
             step2: { // Bank ID
               l1: "L'archive déverrouillée contient un document PDF.",
@@ -507,7 +551,7 @@
               const html = `<div class="app-explorer">
                 ${items.map(i => `
                   <div class="file-item" data-action="open-file" data-id="${i.id}">
-                    <div class="file-icon">${i.type === 'folder' ? '📁' : i.type === 'img' ? '🖼️' : '📄'}</div>
+                    ${i.src ? `<img src="${i.src}" class="file-thumb">` : `<div class="file-icon">${i.type === 'folder' ? '📁' : i.type === 'zip' ? '📦' : i.type === 'exe' ? '⚙️' : '📄'}</div>`}
                     <div class="file-name">${escapeHtml(i.name)}</div>
                   </div>
                 `).join('')}
@@ -527,8 +571,17 @@
               WindowManager.create("explorer", "Fichiers", html, 600, 400);
             },
             handle(id) {
-              const f = FILES.find(x => x.id === id);
-              if(!f) return;
+              let f = FILES.find(x => x.id === id);
+              
+              // Support pour les fichiers virtuels (non présents dans FILES)
+              if(!f) {
+                if(id.startsWith("dir_j")) f = { id: id, type: "folder", name: "Dossier" };
+                else if(id.startsWith("img_")) {
+                  const n = id.split('_')[1];
+                  f = { id: id, type: "img", name: `IMG_20180512_${n}.jpg` };
+                }
+                else return;
+              }
 
               if(f.type === "folder") {
                 if (f.id === "f2") { // Photos_Vacances
@@ -568,35 +621,109 @@
                   // Sous-dossiers Jours
                   const day = f.id.split('_')[1];
                   const photos = [];
-                  for(let i=1; i<=12; i++) {
-                    photos.push({ id: `img_${day}_${i}`, name: `IMG_${day.toUpperCase()}_${i}.jpg`, type: "img" });
-                  }
+                  let start = 1, end = 29;
                   
-                  if (day === "j1") {
-                     photos.push({ id: "img_temoin", name: "IMG_Temoin_Thomas.jpg", type: "img" });
-                  }
-                  if (day === "j2") {
-                     photos.push({ id: "img_lucas", name: "IMG_Cousin_Lucas.jpg", type: "img" });
-                  }
-                  // La photo indice dans le Jour 3
-                  if (day === "j3") {
-                    photos.push({ id: "img_sophie", name: "IMG_Sophie_Alliance.jpg", type: "img" });
+                  if (day === "j1") { start = 1; end = 10; }
+                  else if (day === "j2") { start = 11; end = 20; }
+                  else if (day === "j3") { start = 21; end = 29; }
+
+                  for(let k=start; k<=end; k++) {
+                    photos.push({ 
+                      id: `img_${k}`, 
+                      name: `IMG_20180512_${k}.jpg`, 
+                      type: "img",
+                      src: `image/marriage_${k}.jpg`
+                    });
                   }
                   Apps.Explorer.renderFolder(f.name, photos);
                 }
               } 
               else if(f.type === "img") {
-                let content = `<div style="width:100%;height:100%;background:#333;display:flex;align-items:center;justify-content:center;color:#777;">Image générique</div>`;
+                const imgNum = parseInt(f.id.split('_')[1]);
+                const imgSrc = `image/marriage_${imgNum}.jpg`;
                 
-                if (f.id === "img_sophie") {
-                   content = `<div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:white;flex-direction:column;"><div style="font-size:80px;">💍</div><div style="margin-top:20px;text-align:center;">Sophie & Julien<br>12.05.2018</div></div>`;
-                } else if (f.id === "img_temoin") {
-                   content = `<div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:white;flex-direction:column;"><div style="font-size:80px;">🤵</div><div style="margin-top:20px;text-align:center;">Mon Témoin<br>Thomas</div></div>`;
-                } else if (f.id === "img_lucas") {
-                   content = `<div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:white;flex-direction:column;"><div style="font-size:80px;">🤪</div><div style="margin-top:20px;text-align:center;">Cousin Lucas<br>(Trop bu...)</div></div>`;
+                const isClueImg = (imgNum === 28);
+                const isTemoinImg = (imgNum === 5);
+                const isLucasImg = (imgNum === 15);
+
+                // Métadonnées riches (Fausses pistes + Indices)
+                let metadata = "";
+                if (isClueImg) {
+                    metadata = [
+                        "État: ANALYSE COMPLÈTE",
+                        "Date Prise de vue: 12/05/2018 16:34:22", // INDICE
+                        "Appareil: Canon EOS 5D Mark IV",
+                        "Exposition: 1/200s à f/2.8",
+                        "ISO: 100",
+                        "GPS Lat: 48.8566 N (Paris)",
+                        "GPS Long: 2.3522 E",
+                        "Logiciel: Adobe Lightroom 7.3",
+                        "Auteur: Studio Photographie",
+                        "Copyright: © 2018 - Tous droits réservés",
+                        "Dimensions: 6720 x 4480 px",
+                        "Espace Colo: sRGB",
+                        "Note: 'Le plus beau jour...'"
+                    ].join('\n');
+                } else {
+                    // Génération de bruit et fausses pistes
+                    const years = ["2018", "2020", "2023", "2024"];
+                    const y = years[Math.floor(Math.random() * years.length)];
+                    const cams = ["iPhone X", "Nikon D850", "Sony A7III", "Samsung S21"];
+                    const cam = cams[Math.floor(Math.random() * cams.length)];
+                    
+                    metadata = [
+                        "État: FICHIER PARTIELLEMENT CORROMPU",
+                        `Date Modification: 15/08/${y} 10:00:00`,
+                        `Appareil: ${cam}`,
+                        "GPS: Données manquantes",
+                        "Compression: JPEG (85%)",
+                        "Source: SyncMobile Cloud",
+                        "Avertissement: Métadonnées incohérentes"
+                    ].join('\n');
+                    
+                    if (isTemoinImg) {
+                         metadata = "État: OK\nSujet: Thomas (Témoin)\nDate: 12/05/2018\nLieu: Mairie\nNote: Discours émouvant.";
+                    }
+                    if (isLucasImg) {
+                         metadata = "État: OK\nSujet: Lucas\nDate: 13/05/2018 02:00\nNote: Fin de soirée difficile...";
+                    }
                 }
 
-                WindowManager.create("viewer-"+f.id, f.name, content, 500, 400);
+                const emoji = isClueImg ? "💍" : isTemoinImg ? "🤵" : isLucasImg ? "🤪" : "🖼️";
+                const label = isClueImg ? "Sophie & Julien" : isTemoinImg ? "Mon Témoin" : isLucasImg ? "Cousin Lucas" : "Photo";
+
+                const html = `
+                    <div class="app-photos">
+                        <div class="p-canvas">
+                            <img src="${imgSrc}" class="img-scan-load" style="max-width:100%; max-height:100%; object-fit:contain; box-shadow:0 0 30px rgba(0,0,0,0.5);" 
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                            <div style="display:none; flex-direction:column; align-items:center; justify-content:center; color:white;">
+                                <div style="font-size:80px;">${emoji}</div>
+                                <div style="margin-top:20px; text-align:center;">${label}<br><span style="font-size:10px; opacity:0.5; font-family:monospace;">${imgSrc} introuvable</span></div>
+                            </div>
+                        </div>
+                        <div class="p-sidebar">
+                            <div style="font-weight:bold; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px; color:#fff;">PROPRIÉTÉS</div>
+                            <div id="meta-content-${f.id}" style="flex:1; overflow-y:auto; font-family:'Share Tech Mono', monospace; font-size:11px;">
+                                <div class="p-meta-row">
+                                    <span class="p-meta-lbl">Nom Fichier</span>
+                                    <span style="color:#fff;">${escapeHtml(f.name)}</span>
+                                </div>
+                                <div class="p-meta-row">
+                                    <span class="p-meta-lbl">Type</span>
+                                    <span style="color:#aaa;">Image JPEG</span>
+                                </div>
+                                <div id="scan-results-${f.id}" style="display:none; margin-top:20px; border-top:1px dashed #555; padding-top:15px;">
+                                    <div style="color:var(--color-accent); font-weight:bold; margin-bottom:10px;">RÉSULTATS DU SCAN</div>
+                                    <!-- Results injected here -->
+                                </div>
+                            </div>
+                            <button class="btn-scan" data-action="scan-metadata" data-target-id="${f.id}" data-metadata="${escapeHtml(metadata)}">
+                                LANCER L'ANALYSE FORENSIQUE
+                            </button>
+                        </div>
+                    </div>`;
+                WindowManager.create("viewer-"+f.id, f.name, html, 900, 600);
               }
               else if(f.type === "exe") {
                 if(f.content === "virus") {
@@ -925,6 +1052,8 @@
           },
 
           Terminal: {
+    history: [],
+    historyIndex: 0,
     open() {
       const html = `
         <div class="app-term" id="term-app" onclick="document.getElementById('term-input').focus()">
@@ -945,12 +1074,26 @@
           input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
               const cmd = input.value;
+              Apps.Terminal.history.push(cmd);
+              Apps.Terminal.historyIndex = Apps.Terminal.history.length;
               Apps.Terminal.print("$ " + cmd);
               Apps.Terminal.handleCommand(cmd);
               input.value = "";
               // Scroll auto
               const app = document.getElementById("term-app");
               if(app) app.scrollTop = app.scrollHeight;
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              if (Apps.Terminal.history.length > 0) {
+                Apps.Terminal.historyIndex = Math.max(0, Apps.Terminal.historyIndex - 1);
+                input.value = Apps.Terminal.history[Apps.Terminal.historyIndex];
+              }
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              if (Apps.Terminal.historyIndex < Apps.Terminal.history.length) {
+                Apps.Terminal.historyIndex++;
+                input.value = Apps.Terminal.history[Apps.Terminal.historyIndex] || "";
+              }
             }
           });
         }
@@ -972,7 +1115,7 @@
 
       // Command Registry
       const commands = {
-        help: () => this.print("Commandes : help, netscan, connect [ip], ls, cat [file], sort [folder]"),
+        help: () => this.print("Commandes : help, ls, cat [fichier], netscan, connect [ip], pass [mdp], sort [dossier], decrypt [fichier]"),
         
         netscan: () => {
           this.print("Scan du réseau local en cours...");
@@ -1031,6 +1174,18 @@
             STATE.flags.ibanFound = true;
           } else {
             this.print("Fichier introuvable.");
+          }
+        },
+
+        decrypt: (args) => {
+          if (args[0] === "secure_notes.dat") {
+            this.print("Déchiffrement en cours...");
+            setTimeout(() => {
+              this.print("Succès. Contenu déchiffré :");
+              this.print(">> MÉMO : Le mot de passe de l'archive est une date importante. J'ai gardé une photo de ce jour-là.");
+            }, 1500);
+          } else {
+            this.print("Erreur : Fichier introuvable ou non chiffré.");
           }
         }
       };
@@ -1209,7 +1364,36 @@
             'go': () => Apps.Browser.go(actionEl.dataset.route),
             'check-bank-login': () => Apps.Browser.askOTP(),
             'check-otp': () => Apps.Browser.checkOTP(),
-            'do-transfer': () => Apps.Browser.doTransfer()
+            'do-transfer': () => Apps.Browser.doTransfer(),
+            'scan-metadata': () => {
+              const btn = actionEl;
+              const targetId = btn.dataset.targetId;
+              const metadata = btn.dataset.metadata;
+              const metaContainer = $(`#scan-results-${targetId}`);
+
+              if (!metaContainer) return;
+
+              btn.textContent = "SCAN EN COURS...";
+              btn.disabled = true;
+
+              setTimeout(() => {
+                  const newContent = metadata.split('\n').map(line => {
+                      const [label, ...value] = line.split(':');
+                      const isDate = label.toLowerCase().includes('date');
+                      const valueStr = value.join(':').trim();
+                      return `
+                          <div class="p-meta-row">
+                              <span class="p-meta-lbl" style="color:#888;">${escapeHtml(label)}</span>
+                              <span style="${isDate ? 'color:#fbbf24; font-weight:bold;' : 'color:#fff;'}">${escapeHtml(valueStr)}</span>
+                          </div>`;
+                  }).join('');
+
+                  metaContainer.innerHTML = newContent;
+                  metaContainer.style.display = "block";
+                  metaContainer.scrollIntoView({ behavior: "smooth" });
+                  btn.textContent = "SCAN TERMINÉ";
+              }, 1500);
+            }
           };
 
           if (handlers[action]) handlers[action]();
