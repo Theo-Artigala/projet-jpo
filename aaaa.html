@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OSINT-OS v5.1 — Level 2: Follow the Money</title>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Dynamic favicon -->
+    <link id="dyn-favicon" rel="icon" href="" />
+
+    <style>
+      /* --- REUSED STYLES FROM LEVEL 1 (Optimized) --- */
+      :root {
+        /* Darker, more serious theme for Level 2 */
+        --bg-wallpaper: url("https://images.unsplash.com/photo-1518544806308-c8f325cc77cc?q=80&w=2000&auto=format&fit=crop");
+        --color-dark: #0f172a;
+        --color-dark-glass: rgba(10, 10, 15, 0.92);
+        --color-light: #f8fafc;
+        --color-accent: #8b5cf6; /* Purple accent for Lvl 2 */
+        --color-accent-dim: rgba(139, 92, 246, 0.2);
+        --color-danger: #ef4444;
+        --color-warning: #f59e0b;
+        --color-success: #10b981;
+        --color-border: rgba(255, 255, 255, 0.1);
+        --radius-win: 8px;
+        --shadow-win: 0 25px 60px -12px rgba(0, 0, 0, 0.9);
+        --blur-glass: blur(20px);
+        --header-height: 36px;
+      }
+
+      * { box-sizing: border-box; user-select: none; outline: none; -webkit-font-smoothing: antialiased; }
+      html, body { margin: 0; padding: 0; height: 100vh; overflow: hidden; background: #000; font-family: Inter, sans-serif; color: var(--color-light); }
+      
+      /* CRT Effect */
+      .crt-overlay {
+        position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        background-size: 100% 2px, 3px 100%;
+        opacity: 0.3; pointer-events: none;
+      }
+
+      /* Utilities */
+      .hidden { display: none !important; }
+      .flex-center { display: flex; align-items: center; justify-content: center; }
+      .full-size { width: 100%; height: 100%; }
+      .font-mono { font-family: "JetBrains Mono", monospace; }
+      .clickable:hover { cursor: pointer; filter: brightness(1.2); transform: scale(1.02); transition: 0.2s; }
+
+      /* BOOT & LOGIN */
+      #boot-layer { position: fixed; inset: 0; background: #000; z-index: 9999; padding: 40px; font-family: "Share Tech Mono", monospace; color: var(--color-accent); display: flex; flex-direction: column; justify-content: flex-end; font-size: 16px; }
+      .boot-line { margin-bottom: 6px; opacity: 0; animation: fadeIn 0.1s forwards; border-left: 2px solid transparent; padding-left: 10px; }
+      @keyframes fadeIn { to { opacity: 1; } }
+
+      /* DESKTOP */
+      #desktop { position: fixed; inset: 0; background: #1e293b var(--bg-wallpaper) center/cover; z-index: 1; overflow: hidden; }
+      #status-bar { height: var(--header-height); background: rgba(5, 5, 10, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 13px; font-weight: 500; color: #cbd5e1; }
+      .sb-group { display: flex; gap: 20px; align-items: center; }
+
+      #icon-grid { position: absolute; top: 50px; left: 20px; bottom: 100px; width: 100px; display: flex; flex-direction: column; gap: 15px; }
+      .desktop-icon { width: 90px; padding: 10px 5px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; text-align: center; color: #e2e8f0; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+      .desktop-icon:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.1); backdrop-filter: blur(4px); }
+      .di-img { font-size: 36px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
+      .di-label { font-size: 11px; font-weight: 600; line-height: 1.3; }
+
+      /* WINDOWS */
+      .window { position: absolute; background: var(--color-dark-glass); border: 1px solid var(--color-border); border-radius: var(--radius-win); box-shadow: var(--shadow-win); backdrop-filter: var(--blur-glass); display: flex; flex-direction: column; overflow: hidden; opacity: 0; transform: scale(0.95); transition: opacity 0.2s, transform 0.2s; min-width: 300px; min-height: 200px; }
+      .window.open { opacity: 1; transform: scale(1); }
+      .win-header { height: 40px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; padding: 0 12px; cursor: default; }
+      .win-controls { display: flex; gap: 8px; margin-right: 15px; }
+      .wc-btn { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
+      .wc-close { background: #ef4444; } .wc-min { background: #f59e0b; } .wc-max { background: #10b981; }
+      .win-title { flex: 1; text-align: center; font-size: 13px; opacity: 0.7; pointer-events: none; font-weight: 500; letter-spacing: 0.5px; }
+      .win-content { flex: 1; position: relative; overflow: hidden; background: rgba(0, 0, 0, 0.2); color: #e2e8f0; }
+
+      /* MISSION HUD */
+      #mission-hud { position: absolute; top: 50px; right: 20px; width: 380px; background: rgba(10, 10, 15, 0.85); border: 1px solid var(--color-border); border-radius: 8px; padding: 15px; z-index: 50; backdrop-filter: blur(15px); transform: translateX(120%); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+      #mission-hud.active { transform: translateX(0); }
+      .hud-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+      .hud-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--color-accent); font-weight: 800; }
+      #mission-brief { font-size: 13px; color: #cbd5e1; line-height: 1.5; margin-top: 10px; }
+      
+      /* TOAST */
+      #toast-area { position: fixed; top: 60px; right: 420px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+      .toast { pointer-events: auto; background: rgba(20, 20, 20, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); border-left: 4px solid var(--color-accent); padding: 14px; border-radius: 6px; width: 340px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
+      @keyframes slideIn { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+      /* APPS SPECIFIC */
+      .app-explorer { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; align-content: start; height: 100%; overflow-y: auto; }
+      .file-item { display: flex; flex-direction: column; align-items: center; padding: 10px; border-radius: 6px; cursor: pointer; transition: 0.2s; text-align: center; }
+      .file-item:hover { background: rgba(255,255,255,0.05); }
+      .file-icon { font-size: 32px; margin-bottom: 5px; }
+      .file-name { font-size: 11px; word-break: break-word; max-width: 100%; line-height: 1.3; }
+
+      .app-chat { display: flex; height: 100%; background: #1e1e1e; color: #eee; font-family: 'Segoe UI', sans-serif; }
+      .chat-sidebar { width: 200px; background: #252526; border-right: 1px solid #333; display: flex; flex-direction: column; }
+      .chat-list { flex: 1; overflow-y: auto; }
+      .chat-contact { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+      .chat-contact:hover { background: #2a2d2e; }
+      .chat-contact.active { background: #37373d; }
+      .chat-avatar { width: 32px; height: 32px; border-radius: 50%; background: #555; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+      .chat-main { flex: 1; display: flex; flex-direction: column; background: #1e1e1e; }
+      .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+      .msg { max-width: 70%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; }
+      .msg.in { background: #333; align-self: flex-start; border-bottom-left-radius: 2px; }
+      .msg.out { background: var(--color-accent); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+      .chat-lock-screen { position: absolute; inset: 0; background: rgba(30,30,30,0.95); backdrop-filter: blur(5px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+
+      .app-browser { display: flex; flex-direction: column; height: 100%; background: #fff; color: #333; }
+      .b-bar { padding: 8px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; gap: 10px; }
+      .b-input { flex: 1; padding: 6px 12px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 13px; color: #475569; background: white; }
+      .b-content { flex: 1; overflow-y: auto; position: relative; }
+
+      /* DOCK */
+      #dock-container { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; justify-content: center; z-index: 1000; }
+      #dock { background: rgba(20, 20, 20, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 20px; display: flex; gap: 12px; }
+      .dock-app { width: 50px; height: 50px; border-radius: 12px; font-size: 28px; background: rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; position: relative; border: 1px solid rgba(255, 255, 255, 0.05); }
+      .dock-app:hover { transform: translateY(-10px) scale(1.1); background: rgba(255, 255, 255, 0.15); }
+      .dock-app.running::after { content: ""; position: absolute; bottom: -6px; width: 4px; height: 4px; background: var(--color-accent); border-radius: 50%; }
+
+      /* TERMINAL */
+      .app-term { background: #0c0c0c; color: #ccc; font-family: "JetBrains Mono", monospace; padding: 15px; height: 100%; overflow-y: auto; font-size: 13px; }
+      .term-line { margin-bottom: 4px; word-break: break-all; }
+      .term-prompt { color: var(--color-success); margin-right: 8px; }
+      .term-input { background: transparent; border: none; color: white; font-family: inherit; font-size: inherit; width: 100%; outline: none; }
+
+      /* DANGER OVERLAY */
+      #danger-overlay { position: fixed; inset: 0; z-index: 20000; background: rgba(50, 0, 0, 0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+      .danger-active { animation: flashRed 0.5s infinite; }
+      @keyframes flashRed { 0% { background: rgba(255,0,0,0.2); } 50% { background: rgba(255,0,0,0.5); } 100% { background: rgba(255,0,0,0.2); } }
+      .danger-text { font-size: 120px; color: #ef4444; font-weight: 900; font-family: 'Share Tech Mono'; text-shadow: 0 0 30px red; letter-spacing: 10px; animation: shake 0.2s infinite; display: none; }
+      @keyframes shake { 0% { transform: translate(0,0); } 25% { transform: translate(5px, -5px); } 50% { transform: translate(-5px, 5px); } 75% { transform: translate(5px, 5px); } 100% { transform: translate(0,0); } }
+      .antivirus-msg { font-family: 'Share Tech Mono'; color: #10b981; font-size: 24px; margin-top: 20px; text-shadow: 0 0 10px #10b981; display: none; }
+      
+      /* TERMINAL SPECIFIC */
+      .term-window { background: #0c0c0c; color: #0f0; font-family: 'JetBrains Mono', monospace; padding: 15px; height: 100%; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; }
+      .term-output { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+      .term-line { word-break: break-all; }
+      .term-input-area { display: flex; margin-top: 10px; align-items: center; }
+      .term-prompt { color: #10b981; margin-right: 10px; font-weight: bold; }
+      .term-input { background: transparent; border: none; color: #fff; flex: 1; outline: none; font-family: inherit; font-size: inherit; }
+      .term-progress { width: 100%; background: #333; height: 10px; margin-top: 5px; display: none; }
+      .term-bar { height: 100%; background: #10b981; width: 0%; transition: width 0.2s; }
+
+      /* PHOTO VIEWER (from Lvl 1, adapted) */
+      .app-photos {
+        display: flex;
+        height: 100%;
+        background: #111;
+        color: #eee;
+      }
+      .p-canvas {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(#222 1px, transparent 1px);
+        background-size: 30px 30px;
+      }
+      .p-sidebar {
+        width: 300px;
+        background: #1a1a1a;
+        border-left: 1px solid #333;
+        padding: 20px;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+      }
+      .p-meta-row { margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+      .p-meta-lbl { color: #666; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; display: block; font-size: 10px; }
+      .btn-scan {
+        margin-top: auto; width: 100%; padding: 12px;
+        background: linear-gradient(135deg, var(--color-accent), #a78bfa);
+        border: none; color: white; font-weight: 900; cursor: pointer; border-radius: 10px;
+      }
+      .btn-scan[disabled] { opacity: 0.5; cursor: wait; }
+      
+      /* NEW: Image Thumbnails & Loading Effect */
+      .file-thumb { width: 100%; height: 60px; object-fit: cover; border-radius: 4px; margin-bottom: 5px; background: #222; }
+      .img-scan-load {
+        clip-path: inset(0 0 100% 0);
+        animation: scanLoad 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      @keyframes scanLoad { to { clip-path: inset(0 0 0 0); } }
+
+    </style>
+  </head>
+
+  <body>
+    <div class="crt-overlay"></div>
+    
+    <!-- BOOT SEQUENCE -->
+    <div id="boot-layer">
+      <div id="boot-log"></div>
+    </div>
+
+    <!-- GAME OVER / WIN SCREENS -->
+    <div id="end-screen" class="hidden" style="position: fixed; inset: 0; z-index: 10000; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Share Tech Mono', monospace; text-align: center;">
+       <h1 id="end-title" style="font-size: 48px; margin-bottom: 20px;"></h1>
+       <p id="end-msg" style="color: white; font-size: 18px; max-width: 600px; line-height: 1.5;"></p>
+       <button onclick="location.reload()" style="margin-top: 30px; background: transparent; border: 1px solid white; color: white; padding: 10px 20px; cursor: pointer; font-family: inherit;">RESTART SYSTEM</button>
+    </div>
+
+    
+    <div id="toast-area"></div>
+
+    <!-- DANGER OVERLAY -->
+    <div id="danger-overlay" class="hidden">
+      <div class="danger-text">DANGER</div>
+      <div class="antivirus-msg">MENACE DÉTECTÉE... NEUTRALISATION EN COURS</div>
+    </div>
+
+    <!-- DESKTOP -->
+    <div id="desktop" class="hidden">
+      <div id="status-bar">
+        <div class="sb-group">
+          <span style="font-weight: 900; color: var(--color-accent);"> OSINT-OS v5.1</span>
+          <span>Fichier</span>
+          <span>Édition</span>
+          <span>Outils</span>
+        </div>
+        <div class="sb-group">
+          <span id="game-timer" style="color: var(--color-warning); font-weight: bold; font-family: 'Share Tech Mono'; font-size: 16px;">30:00</span>
+          <span style="opacity: 0.5;">|</span>
+          <span>📶 Connected (VPN)</span>
+          <span id="clock" class="font-mono">00:00</span>
+        </div>
+      </div>
+
+      <div id="mission-hud">
+        <div class="hud-header">
+          <span class="hud-title">Mission : Flux Financier</span>
+          <button id="btn-toggle-hints" style="background:none; border:1px solid #64748b; color:#94a3b8; font-size:10px; cursor:pointer; border-radius:4px; padding:2px 6px;">Aide</button>
+        </div>
+        <div id="hint-selector" style="display:flex; gap:5px; margin-top:10px;">
+          <button data-action="get-hint" data-level="1" style="flex:1; background:rgba(139,92,246,0.1); border:1px solid var(--color-accent); color:var(--color-accent); font-size:10px; cursor:pointer; border-radius:4px; padding:4px;">Indice 1</button>
+          <button data-action="get-hint" data-level="2" style="flex:1; background:rgba(139,92,246,0.1); border:1px solid var(--color-accent); color:var(--color-accent); font-size:10px; cursor:pointer; border-radius:4px; padding:4px;">Indice 2</button>
+          <button data-action="get-hint" data-level="3" style="flex:1; background:rgba(239,68,68,0.1); border:1px solid var(--color-danger); color:var(--color-danger); font-size:10px; cursor:pointer; border-radius:4px; padding:4px;">Solution</button>
+        </div>
+        <div id="mission-brief">
+          Initialisation...
+        </div>
+      </div>
+
+      <div id="icon-grid"></div>
+      <div id="windows-area"></div>
+
+      <div id="dock-container">
+        <div id="dock"></div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const $ = (sel, root = document) => root.querySelector(sel);
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const escapeHtml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+        // -------------------------------------------------------
+        // GAME DATA & STATE
+        // -------------------------------------------------------
+        const STATE = {
+          flags: {
+            timeLeft: 1800, // 30 minutes
+            timerInterval: null,
+            archive_unlocked: false,
+            bank_id_found: false,
+            chat_unlocked: false,
+            otp_seen: false,
+            bank_accessed: false,
+            virus_active: false,
+            photos_sorted: false
+          }
+        };
+
+        const TARGET = {
+          name: "Julien Dupuis",
+          weddingDate: "12052018", // Password for Archive
+          chatPass: "Thomas2023", // Password for Chat (Témoin + Bali)
+          bankID: "8842901", // Found in PDF
+          bankPass: "Mistigri2024!", // Not needed, we use OTP flow
+          otpCode: "892 441",
+          safeIBAN: "FR76 4040 1234 5678 9000",
+          nasIP: "192.168.1.55",
+          nasPass: "2018sophie"
+        };
+
+        const FILES = [
+          { id: "f1", name: "Finance_2024.zip", type: "zip", locked: true, content: "bank_statement_partial.pdf" },
+          { id: "f2", name: "Photos_Vacances", type: "folder", content: "useless" },
+          { id: "f3", name: "bitcoin_wallet.exe", type: "exe", content: "virus" },
+          { id: "f4", name: "todo_urgent.txt", type: "text", content: "- Appeler le notaire\n- Vérifier les comptes NeoBank\n- Acheter croquettes pour Mistigri\n- Si problème, transférer fonds vers compte de secours. Coordonnées sur le serveur NAS (IP cachée)." },
+          { id: "f5", name: "secure_notes.dat", type: "dat", content: "ENCRYPTED_DATA_BLOCK_42_XF" },
+          {id: "todo", name: "todo_urgent.txt", type: "text",content:"Si problème, transférer fonds vers compte de secours.\nCoordonnées sur le serveur NAS.",},
+        ];
+
+        const EMAILS = [
+          {
+            id: 1,
+            from: "NeoBank Sécurité",
+            sub: "Alerte de connexion",
+            date: "Hier",
+            body: "Une tentative de connexion a échoué. Si ce n'est pas vous, sécurisez votre compte immédiatement via l'application SyncMobile."
+          },
+          {
+            id: 2,
+            from: "Maman",
+            sub: "Souvenirs",
+            date: "10/05/2025",
+            body: "Coucou Julien, je suis retombée sur les photos de votre mariage en 2018. Quelle belle journée c'était ! Bisous."
+          },
+          {
+            id: 3,
+            from: "Service IT",
+            sub: "Mise à jour SyncMobile",
+            date: "01/06/2025",
+            body: "Sécurité renforcée. Votre mot de passe SyncMobile doit désormais suivre le format : <b>[Prénom du témoin de mariage]</b> + <b>[Année du voyage à Bali]</b>.<br>Exemple : Pierre2015."
+          },
+          {
+            id: 4,
+            from: "Loterie Gagnante",
+            sub: "VOUS AVEZ GAGNÉ !!",
+            date: "Aujourd'hui",
+            body: "Cliquez ici pour réclamer vos 500.000€ !!! (Ceci est un spam)"
+          },
+          {
+            id: 5,
+            from: "Support IT",
+            sub: "Rappel mot de passe NAS",
+            date: "12052025",
+            body:
+            "Bonjour Julien,<br><br>" +
+            "Suite à votre demande, votre mot de passe NAS a été réinitialisé.<br>" +
+            "Format de mot de passe : année de marriage suivie du nom de votre femme (tout en minuscules).<br><br>" +
+            "Cordialement,<br>Support IT",
+          },
+          {
+            id: 6,
+            from: "Voyage-Privé",
+            sub: "Confirmation Bali",
+            date: "15/03/2023",
+            body: "Votre séjour à Bali est confirmé pour l'été 2023. N'oubliez pas vos passeports !"
+          },
+          {
+            id: 7,
+            from: "EasyFly",
+            sub: "Billets Rome (Annulé)",
+            date: "10/09/2024",
+            body: "Suite à votre demande, vos billets pour Rome (Octobre 2024) ont été annulés."
+          },
+          {
+            id: 8,
+            from: "Vétérinaire",
+            sub: "Rappel Vaccin Mistigri",
+            date: "Hier",
+            body: "N'oubliez pas le rappel de vaccin pour Mistigri (né en 2020)."
+          }
+        ];
+        
+
+        const CHATS = [
+          {
+            contact: "Marc (IT)",
+            msgs: [
+              { dir: "in", txt: "Salut Ju, t'as vu le mail pour la maj SyncMobile ?" },
+              { dir: "out", txt: "Ouais c'est bon." },
+              { dir: "in", txt: "Oublie pas, sécu max. Mets pas un mdp trop simple." },
+              { dir: "out", txt: "T'inquiète, j'ai mis le nom du chat." }
+            ]
+          },
+          {
+            contact: "NeoBank Auth",
+            msgs: [
+              { dir: "in", txt: "Code de validation : 112 993. Ne le partagez jamais." },
+              { dir: "in", txt: "Code de validation : 554 021. Ne le partagez jamais." }
+            ]
+          },
+          {
+            contact: "Sophie",
+            msgs: [
+              { dir: "in", txt: "Tu rentres à quelle heure ?" },
+              { dir: "out", txt: "Tard, je dois finir un truc sur les comptes." }
+            ]
+          }
+        ];
+
+        // -------------------------------------------------------
+        // STORY ENGINE
+        // -------------------------------------------------------
+        const Story = {
+          hints: {
+            step1: { // Archive
+              l1: "Le fichier 'Finance_2024.zip' est verrouillé. Le mot de passe est une date.",
+              l2: "Triez le dossier 'Photos_Vacances' avec la commande 'sort'. Cherchez une photo-indice dans le dossier 'Mariage_Trie'.",
+              l3: "Ouvrez la photo de l'alliance ('IMG_Sophie_Alliance.jpg') et scannez ses métadonnées pour trouver la date : 12/05/2018. Le mot de passe est 12052018."
+            },
+            step2: { // Bank ID
+              l1: "L'archive déverrouillée contient un document PDF.",
+              l2: "Ouvrez le PDF extrait pour trouver l'identifiant client NeoBank.",
+              l3: "L'ID est en haut à droite du document : 8842901."
+            },
+            step3: { // Chat / OTP
+              l1: "Le mot de passe SyncMobile a changé (voir mail IT). Il faut croiser les infos des Photos et des Mails.",
+              l2: "Cherchez le prénom du témoin dans les photos triées (Jour 1) et l'année de Bali dans les mails.",
+              l3: "Témoin : Thomas. Bali : 2023. Mot de passe : Thomas2023"
+            },
+            step4: { // Final
+              l1: "Connectez-vous à NeoBank avec l'ID et le code reçu.",
+               l2: "Une fois connecté, allez dans 'Virements'. L'IBAN de destination est dans la note déchiffrée.",
+               l3: "IBAN : FR76 1234 5678 9012. Videz le compte offshore."
+            }
+          },
+
+          getStep() {
+            if (!STATE.flags.archive_unlocked) return "step1";
+            if (!STATE.flags.bank_id_found) return "step2";
+            if (!STATE.flags.otp_seen) return "step3";
+            return "step4";
+          },
+
+          updateBrief() {
+            const step = this.getStep();
+            const texts = {
+              step1: "Objectif : Accéder aux archives financières chiffrées.",
+              step2: "Objectif : Trouver les identifiants bancaires dans les documents.",
+              step3: "Objectif : Intercepter le code de sécurité (2FA) sur le mobile.",
+               step4: "Objectif : Effectuer un virement de l'argent sale vers le compte sécurisé."
+            };
+            $("#mission-brief").innerHTML = texts[step] + "<br><span style='font-size:11px; opacity:0.6; font-style:italic;'>Utilisez les indices si vous êtes bloqué.</span>";
+          },
+
+          showHint(level) {
+            const step = this.getStep();
+            const txt = this.hints[step][`l${level}`];
+            Toast.show(`Indice ${level}`, txt, "info");
+          }
+        };
+
+        // -------------------------------------------------------
+        // WINDOW MANAGER
+        // -------------------------------------------------------
+        let zIndex = 100;
+        const WindowManager = {
+          create(id, title, content, w = 600, h = 400) {
+            const existing = document.getElementById(`win-${id}`);
+            if (existing) return this.focus(id);
+
+            const win = document.createElement("div");
+            win.id = `win-${id}`;
+            win.className = "window open";
+            
+            const left = clamp((window.innerWidth - w) / 2 + (Math.random() * 40 - 20), 10, window.innerWidth - w - 10);
+            const top = clamp((window.innerHeight - h) / 2 + (Math.random() * 40 - 20), 50, window.innerHeight - h - 90);
+
+            Object.assign(win.style, {
+              width: `${w}px`, height: `${h}px`, left: `${left}px`, top: `${top}px`, zIndex: ++zIndex
+            });
+
+            win.innerHTML = `
+              <div class="win-header" data-drag="${id}">
+                <div class="win-controls">
+                  <div class="wc-btn wc-close" data-close="${id}"></div>
+                  <div class="wc-btn wc-min"></div>
+                  <div class="wc-btn wc-max"></div>
+                </div>
+                <div class="win-title">${escapeHtml(title)}</div>
+              </div>
+              <div class="win-content">${content}</div>
+            `;
+            
+            $("#windows-area").appendChild(win);
+            win.addEventListener("mousedown", () => this.focus(id));
+            
+            // Dock animation
+            const dockItem = document.querySelector(`.dock-app[data-app="${id.split('-')[0]}"]`);
+            if(dockItem) dockItem.classList.add("running");
+
+            // Event listeners for controls
+            win.querySelector(`[data-close="${id}"]`).addEventListener("click", (e) => { e.stopPropagation(); this.close(id); });
+            win.querySelector(`[data-drag="${id}"]`).addEventListener("mousedown", (e) => this.dragStart(e, id));
+          },
+
+          close(id) {
+            const win = document.getElementById(`win-${id}`);
+            if(win) {
+              win.classList.remove("open");
+              setTimeout(() => {
+                win.remove();
+                const appType = id.split('-')[0];
+                if (!document.querySelector(`.window[id^="win-${appType}"]`)) {
+                  const dockItem = document.querySelector(`.dock-app[data-app="${appType}"]`);
+                  if(dockItem) dockItem.classList.remove("running");
+                }
+              }, 200);
+            }
+          },
+
+          focus(id) {
+            const win = document.getElementById(`win-${id}`);
+            if(win) win.style.zIndex = ++zIndex;
+          },
+
+          dragStart(e, id) {
+            if(e.target.classList.contains('wc-btn')) return;
+            const win = document.getElementById(`win-${id}`);
+            this.focus(id);
+            const rect = win.getBoundingClientRect();
+            const offX = e.clientX - rect.left;
+            const offY = e.clientY - rect.top;
+
+            const move = (ev) => {
+              const x = clamp(ev.clientX - offX, 0, window.innerWidth - 50);
+              const y = clamp(ev.clientY - offY, 0, window.innerHeight - 50);
+              win.style.left = x + "px";
+              win.style.top = y + "px";
+            };
+            const up = () => {
+              document.removeEventListener("mousemove", move);
+              document.removeEventListener("mouseup", up);
+            };
+            document.addEventListener("mousemove", move);
+            document.addEventListener("mouseup", up);
+          }
+        };
+
+        // -------------------------------------------------------
+        // APPS
+        // -------------------------------------------------------
+        const Apps = {
+          launch(app) {
+            const map = {
+              explorer: Apps.Explorer.open,
+              mail: Apps.Mail.open,
+              chat: Apps.Chat.open,
+              browser: Apps.Browser.open,
+              terminal: Apps.Terminal.open,
+              note: () => Apps.Explorer.handle('f4')
+            };
+            if(map[app]) map[app]();
+          },
+
+          Explorer: {
+            renderFolder(title, items) {
+              const html = `<div class="app-explorer">
+                ${items.map(i => `
+                  <div class="file-item" data-action="open-file" data-id="${i.id}">
+                    ${i.src ? `<img src="${i.src}" class="file-thumb">` : `<div class="file-icon">${i.type === 'folder' ? '📁' : i.type === 'zip' ? '📦' : i.type === 'exe' ? '⚙️' : '📄'}</div>`}
+                    <div class="file-name">${escapeHtml(i.name)}</div>
+                  </div>
+                `).join('')}
+              </div>`;
+              WindowManager.create("explorer-" + Date.now(), title, html, 600, 400);
+            },
+
+            open() {
+              const renderFiles = () => FILES.map(f => `
+                <div class="file-item" data-action="open-file" data-id="${f.id}">
+                  <div class="file-icon">${f.type === 'folder' ? '📁' : f.type === 'zip' ? '📦' : f.type === 'exe' ? '⚙️' : '📄'}</div>
+                  <div class="file-name">${escapeHtml(f.name)}</div>
+                </div>
+              `).join('');
+
+              const html = `<div class="app-explorer">${renderFiles()}</div>`;
+              WindowManager.create("explorer", "Fichiers", html, 600, 400);
+            },
+            handle(id) {
+              let f = FILES.find(x => x.id === id);
+              
+              // Support pour les fichiers virtuels (non présents dans FILES)
+              if(!f) {
+                if(id.startsWith("dir_j")) f = { id: id, type: "folder", name: "Dossier" };
+                else if(id.startsWith("img_")) {
+                  const n = id.split('_')[1];
+                  f = { id: id, type: "img", name: `IMG_20180512_${n}.jpg` };
+                }
+                else return;
+              }
+
+              if(f.type === "folder") {
+                if (f.id === "f2") { // Photos_Vacances
+                  if (!STATE.flags.photos_sorted) {
+                    // SPAM MODE
+                    for(let i=0; i<29; i++) {
+                      setTimeout(() => {
+                        const id = 'spam_' + Math.random().toString(36).substr(2, 9);
+                        const x = Math.max(20, Math.random() * (window.innerWidth - 850));
+                        const y = Math.max(20, Math.random() * (window.innerHeight - 650));
+                        const html = `
+                          <div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;position:relative;">
+                            <div class="err-msg" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#888;background:#333;">
+                              <div style="font-size:40px;margin-bottom:10px;">⚠️</div>
+                              <div>Image introuvable</div>
+                              <div style="font-size:10px;margin-top:5px;opacity:0.6;font-family:monospace;">image/marriage_${i + 1}.jpg</div>
+                            </div>
+                            <img src="image/marriage_${i + 1}.jpg" style="width:100%;height:100%;object-fit:contain;position:relative;z-index:2;" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'">
+                          </div>`;
+                        WindowManager.create(id, "Aperçu Image", html, 800, 600);
+                        const win = document.getElementById('win-'+id);
+                        if(win) { win.style.left = x+'px'; win.style.top = y+'px'; }
+                      }, i * 100);
+                    }
+                    Toast.show("Erreur", "Dossier en vrac ! Trop de fichiers.", "error");
+                  } else {
+                    Toast.show("Info", "Dossier vide. Les fichiers ont été déplacés dans 'Mariage_Trie'.", "info");
+                  }
+                } else if (f.id === "f_sorted") {
+                  // Dossier Trié
+                  Apps.Explorer.renderFolder("Mariage_Trie", [
+                    { id: "dir_j1", name: "Jour 1 - Cérémonie", type: "folder" },
+                    { id: "dir_j2", name: "Jour 2 - Repas", type: "folder" },
+                    { id: "dir_j3", name: "Jour 3 - Soirée", type: "folder" }
+                  ]);
+                } else if (f.id.startsWith("dir_j")) {
+                  // Sous-dossiers Jours
+                  const day = f.id.split('_')[1];
+                  const photos = [];
+                  let start = 1, end = 29;
+                  
+                  if (day === "j1") { start = 1; end = 10; }
+                  else if (day === "j2") { start = 11; end = 20; }
+                  else if (day === "j3") { start = 21; end = 29; }
+
+                  for(let k=start; k<=end; k++) {
+                    photos.push({ 
+                      id: `img_${k}`, 
+                      name: `IMG_20180512_${k}.jpg`, 
+                      type: "img",
+                      src: `image/marriage_${k}.jpg`
+                    });
+                  }
+                  Apps.Explorer.renderFolder(f.name, photos);
+                }
+              } 
+              else if(f.type === "img") {
+                const imgNum = parseInt(f.id.split('_')[1]);
+                const imgSrc = `image/marriage_${imgNum}.jpg`;
+                
+                const isClueImg = (imgNum === 28);
+                const isTemoinImg = (imgNum === 5);
+                const isLucasImg = (imgNum === 15);
+
+                // Métadonnées riches (Fausses pistes + Indices)
+                let metadata = "";
+                if (isClueImg) {
+                    metadata = [
+                        "État: ANALYSE COMPLÈTE",
+                        "Date Prise de vue: 12/05/2018 16:34:22", // INDICE
+                        "Appareil: Canon EOS 5D Mark IV",
+                        "Exposition: 1/200s à f/2.8",
+                        "ISO: 100",
+                        "GPS Lat: 48.8566 N (Paris)",
+                        "GPS Long: 2.3522 E",
+                        "Logiciel: Adobe Lightroom 7.3",
+                        "Auteur: Studio Photographie",
+                        "Copyright: © 2018 - Tous droits réservés",
+                        "Dimensions: 6720 x 4480 px",
+                        "Espace Colo: sRGB",
+                        "Note: 'Le plus beau jour...'"
+                    ].join('\n');
+                } else {
+                    // Génération de bruit et fausses pistes
+                    const years = ["2018", "2020", "2023", "2024"];
+                    const y = years[Math.floor(Math.random() * years.length)];
+                    const cams = ["iPhone X", "Nikon D850", "Sony A7III", "Samsung S21"];
+                    const cam = cams[Math.floor(Math.random() * cams.length)];
+                    
+                    metadata = [
+                        "État: FICHIER PARTIELLEMENT CORROMPU",
+                        `Date Modification: 15/08/${y} 10:00:00`,
+                        `Appareil: ${cam}`,
+                        "GPS: Données manquantes",
+                        "Compression: JPEG (85%)",
+                        "Source: SyncMobile Cloud",
+                        "Avertissement: Métadonnées incohérentes"
+                    ].join('\n');
+                    
+                    if (isTemoinImg) {
+                         metadata = "État: OK\nSujet: Thomas (Témoin)\nDate: 12/05/2018\nLieu: Mairie\nNote: Discours émouvant.";
+                    }
+                    if (isLucasImg) {
+                         metadata = "État: OK\nSujet: Lucas\nDate: 13/05/2018 02:00\nNote: Fin de soirée difficile...";
+                    }
+                }
+
+                const emoji = isClueImg ? "💍" : isTemoinImg ? "🤵" : isLucasImg ? "🤪" : "🖼️";
+                const label = isClueImg ? "Sophie & Julien" : isTemoinImg ? "Mon Témoin" : isLucasImg ? "Cousin Lucas" : "Photo";
+
+                const html = `
+                    <div class="app-photos">
+                        <div class="p-canvas">
+                            <img src="${imgSrc}" class="img-scan-load" style="max-width:100%; max-height:100%; object-fit:contain; box-shadow:0 0 30px rgba(0,0,0,0.5);" 
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                            <div style="display:none; flex-direction:column; align-items:center; justify-content:center; color:white;">
+                                <div style="font-size:80px;">${emoji}</div>
+                                <div style="margin-top:20px; text-align:center;">${label}<br><span style="font-size:10px; opacity:0.5; font-family:monospace;">${imgSrc} introuvable</span></div>
+                            </div>
+                        </div>
+                        <div class="p-sidebar">
+                            <div style="font-weight:bold; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px; color:#fff;">PROPRIÉTÉS</div>
+                            <div id="meta-content-${f.id}" style="flex:1; overflow-y:auto; font-family:'Share Tech Mono', monospace; font-size:11px;">
+                                <div class="p-meta-row">
+                                    <span class="p-meta-lbl">Nom Fichier</span>
+                                    <span style="color:#fff;">${escapeHtml(f.name)}</span>
+                                </div>
+                                <div class="p-meta-row">
+                                    <span class="p-meta-lbl">Type</span>
+                                    <span style="color:#aaa;">Image JPEG</span>
+                                </div>
+                                <div id="scan-results-${f.id}" style="display:none; margin-top:20px; border-top:1px dashed #555; padding-top:15px;">
+                                    <div style="color:var(--color-accent); font-weight:bold; margin-bottom:10px;">RÉSULTATS DU SCAN</div>
+                                    <!-- Results injected here -->
+                                </div>
+                            </div>
+                            <button class="btn-scan" data-action="scan-metadata" data-target-id="${f.id}" data-metadata="${escapeHtml(metadata)}">
+                                LANCER L'ANALYSE FORENSIQUE
+                            </button>
+                        </div>
+                    </div>`;
+                WindowManager.create("viewer-"+f.id, f.name, html, 900, 600);
+              }
+              else if(f.type === "exe") {
+                if(f.content === "virus") {
+                  Toast.show("SÉCURITÉ", "MENACE DÉTECTÉE !", "error");
+                  OS.triggerVirus();
+                }
+              }
+              else if(f.type === "zip") {
+                if(f.locked && !STATE.flags.archive_unlocked) {
+                  const pass = prompt("Archive chiffrée. Entrez le mot de passe :");
+                  if(pass === TARGET.weddingDate) {
+                    STATE.flags.archive_unlocked = true;
+                    Toast.show("Succès", "Archive déchiffrée.", "success");
+                    Story.updateBrief();
+                    // Add extracted file
+                    FILES.push({ id: "f_extracted", name: "Relevé_NeoBank.pdf", type: "pdf", content: "ID CLIENT: " + TARGET.bankID });
+                    WindowManager.close("explorer");
+                    Apps.Explorer.open(); // Refresh
+                  } else {
+                    Toast.show("Erreur", "Mot de passe incorrect.", "error");
+                  }
+                } else {
+                  Toast.show("Info", "L'archive est déjà ouverte.", "info");
+                }
+              }
+              else if(f.type === "text") {
+                WindowManager.create("txt-"+id, f.name, `<textarea style="width:100%;height:100%;background:#111;color:#eee;border:none;padding:10px;resize:none;">${f.content}</textarea>`, 400, 300);
+              }
+              else if(f.type === "dat") {
+                Toast.show("Système", "Fichier chiffré. Utilisez le Terminal pour l'ouvrir.", "warning");
+              }
+              else if(f.type === "pdf") {
+                STATE.flags.bank_id_found = true;
+                Story.updateBrief();
+                const html = `
+                  <div style="background:#525659; height:100%; padding:20px; display:flex; justify-content:center;">
+                    <div style="background:white; width:100%; max-width:500px; height:100%; padding:30px; color:black; font-family:serif; box-shadow:0 0 10px rgba(0,0,0,0.5);">
+                      <div style="border-bottom:2px solid #8b5cf6; padding-bottom:10px; margin-bottom:20px; display:flex; justify-content:space-between;">
+                        <span style="font-weight:bold; font-size:20px; color:#8b5cf6;">NeoBank</span>
+                        <span>Relevé Confidentiel</span>
+                      </div>
+                      <p><strong>Client :</strong> M. Julien Dupuis</p>
+                      <p><strong>ID Client :</strong> <span style="background:yellow;">${TARGET.bankID}</span></p>
+                      <br>
+                      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <tr style="background:#eee;"><th style="text-align:left; padding:5px;">Date</th><th style="text-align:left;">Libellé</th><th style="text-align:right;">Montant</th></tr>
+                        <tr><td style="padding:5px;">01/06</td><td>Virement Offshore</td><td style="text-align:right; color:red;">- 15.000 €</td></tr>
+                        <tr><td style="padding:5px;">02/06</td><td>Achat "Croquettes Deluxe"</td><td style="text-align:right;">- 45 €</td></tr>
+                      </table>
+                    </div>
+                  </div>
+                `;
+                WindowManager.create("pdf-"+id, f.name, html, 550, 600);
+              }
+            }
+          },
+
+          Mail: {
+            open() {
+              const renderList = () => EMAILS.map((m, i) => `
+                <div style="padding:12px; border-bottom:1px solid #333; cursor:pointer;" data-action="open-mail" data-id="${i}">
+                  <div style="font-weight:bold; color:#e2e8f0;">${escapeHtml(m.from)}</div>
+                  <div style="font-size:12px; color:#94a3b8;">${escapeHtml(m.sub)}</div>
+                </div>
+              `).join('');
+              
+              const html = `
+                <div style="display:flex; height:100%; background:#1e293b;">
+                  <div style="width:200px; border-right:1px solid #334155; overflow-y:auto;">${renderList()}</div>
+                  <div id="mail-view" style="flex:1; padding:20px; background:#0f172a; color:#cbd5e1;">Sélectionnez un message</div>
+                </div>
+              `;
+              WindowManager.create("mail", "Messagerie", html, 800, 500);
+            },
+            view(idx) {
+              const m = EMAILS[idx];
+              $("#mail-view").innerHTML = `
+                <h3 style="margin-top:0; color:white;">${escapeHtml(m.sub)}</h3>
+                <div style="margin-bottom:20px; font-size:12px; color:#64748b;">De: ${escapeHtml(m.from)} | Le: ${m.date}</div>
+                <div style="line-height:1.6;">${m.body}</div>
+              `;
+            }
+          },
+
+          Chat: {
+            locked: true,
+            open() {
+              if(Apps.Chat.locked && !STATE.flags.chat_unlocked) {
+                const html = `
+                  <div class="app-chat" style="align-items:center; justify-content:center; flex-direction:column;">
+                    <div style="font-size:48px; margin-bottom:10px;">📱</div>
+                    <h3>SyncMobile Verrouillé</h3>
+                    <input type="password" id="chat-pass" placeholder="Mot de passe..." style="padding:10px; border-radius:6px; border:none; margin-bottom:10px; width:200px;">
+                    <button data-action="unlock-chat" style="padding:8px 20px; background:var(--color-accent); color:white; border:none; border-radius:6px; cursor:pointer;">Déverrouiller</button>
+                  </div>
+                `;
+                WindowManager.create("chat", "SyncMobile", html, 400, 500);
+              } else {
+                Apps.Chat.render();
+              }
+            },
+            unlock() {
+              const pass = $("#chat-pass").value;
+              if(pass === TARGET.chatPass) {
+                STATE.flags.chat_unlocked = true;
+                Apps.Chat.locked = false;
+                WindowManager.close("chat");
+                Apps.Chat.open();
+                Toast.show("SyncMobile", "Accès autorisé.", "success");
+                Story.updateBrief();
+              } else {
+                Toast.show("Erreur", "Mot de passe incorrect.", "error");
+              }
+            },
+            render() {
+              const renderContacts = () => CHATS.map((c, i) => `
+                <div class="chat-contact" data-action="open-chat-contact" data-id="${i}">
+                  <div class="chat-avatar">${c.contact[0]}</div>
+                  <div>${escapeHtml(c.contact)}</div>
+                </div>
+              `).join('');
+
+              const html = `
+                <div class="app-chat">
+                  <div class="chat-sidebar">
+                    <div style="padding:15px; font-weight:bold; font-size:12px; color:#888;">MESSAGES</div>
+                    <div class="chat-list">${renderContacts()}</div>
+                  </div>
+                  <div class="chat-main">
+                    <div id="chat-msgs" class="chat-messages">
+                      <div style="opacity:0.5; text-align:center; margin-top:50px;">Sélectionnez une conversation</div>
+                    </div>
+                  </div>
+                </div>
+              `;
+              WindowManager.create("chat", "SyncMobile", html, 700, 500);
+            },
+            load(idx) {
+              const c = CHATS[idx];
+              const msgsHtml = c.msgs.map(m => `<div class="msg ${m.dir}">${escapeHtml(m.txt)}</div>`).join('');
+              $("#chat-msgs").innerHTML = msgsHtml;
+              
+              if(c.contact === "NeoBank Auth") {
+                STATE.flags.otp_seen = true;
+                Story.updateBrief();
+              }
+            },
+            receiveOTP() {
+              // Add OTP message dynamically
+              const bankChat = CHATS.find(c => c.contact === "NeoBank Auth");
+              if(bankChat) {
+                bankChat.msgs.push({ dir: "in", txt: `CODE DE CONNEXION : ${TARGET.otpCode}. Valide 2 minutes.` });
+                // If window open, refresh
+                if(document.getElementById("win-chat")) {
+                  Apps.Chat.render(); // Brute refresh
+                  // Re-select the bank chat if it was open
+                  setTimeout(() => {
+                    const idx = CHATS.findIndex(c => c.contact === "NeoBank Auth");
+                    if(idx >= 0) Apps.Chat.load(idx);
+                  }, 100);
+                  Toast.show("Nouveau Message", "NeoBank Auth vous a envoyé un message.", "info");
+                }
+              }
+            }
+          },
+
+          Browser: {
+            open() {
+              const html = `
+                <div class="app-browser">
+                  <div class="b-bar">
+                    <button data-action="go" data-route="home">🏠</button>
+                    <input id="url-bar" class="b-input" readonly value="https://search.net" />
+                  </div>
+                  <div id="b-view" class="b-content"></div>
+                </div>
+              `;
+              WindowManager.create("browser", "Navigateur", html, 800, 600);
+              Apps.Browser.go('home');
+            },
+            go(page) {
+              const view = $("#b-view");
+              const url = $("#url-bar");
+              if(!view) return;
+
+              const routes = {
+                home: () => {
+                  url.value = "https://search.net";
+                  return `
+                  <div class="flex-center full-size" style="flex-direction:column; gap:20px;">
+                    <h1 style="font-size:40px; color:#333;"><span style="color:#4285f4">G</span><span style="color:#ea4335">o</span><span style="color:#fbbc05">o</span><span style="color:#4285f4">g</span><span style="color:#34a853">l</span><span style="color:#ea4335">e</span></h1>
+                    <input type="text" placeholder="Recherche..." style="padding:10px; width:400px; border-radius:20px; border:1px solid #ccc;">
+                    <div style="display:flex; gap:10px;">
+                      <div class="clickable" data-action="go" data-route="bank" style="padding:10px; background:#f1f3f4; border-radius:8px; text-align:center;">
+                        <div style="font-size:24px;">🏦</div>
+                        <div style="font-size:12px;">NeoBank</div>
+                      </div>
+                    </div>
+                  </div>
+                  `;
+                },
+                bank: () => {
+                  url.value = "https://neobank.secure/login";
+                  return `
+                  <div class="full-size" style="background:#0f172a; color:white; display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#1e293b; padding:40px; border-radius:12px; width:350px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+                      <h2 style="color:#8b5cf6; margin-top:0; text-align:center;">NeoBank</h2>
+                      <p style="text-align:center; font-size:13px; color:#94a3b8; margin-bottom:20px;">Accès Client Sécurisé</p>
+                      
+                      <div style="margin-bottom:15px;">
+                        <label style="font-size:12px; color:#cbd5e1;">Identifiant Client</label>
+                        <input id="bank-id" type="text" style="width:100%; padding:10px; background:#0f172a; border:1px solid #334155; color:white; border-radius:6px; margin-top:5px;">
+                      </div>
+                      
+                      <button data-action="check-bank-login" style="width:100%; padding:12px; background:#8b5cf6; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Connexion</button>
+                    </div>
+                  </div>
+                  `;
+                },
+                "bank-otp": () => {
+                  url.value = "https://neobank.secure/2fa";
+                  setTimeout(() => Apps.Chat.receiveOTP(), 2000);
+                  return `
+                  <div class="full-size" style="background:#0f172a; color:white; display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#1e293b; padding:40px; border-radius:12px; width:350px; text-align:center;">
+                      <div style="font-size:40px; margin-bottom:10px;">🔒</div>
+                      <h3>Vérification 2FA</h3>
+                      <p style="font-size:13px; color:#94a3b8;">Un code a été envoyé sur votre mobile sécurisé.</p>
+                      <input id="otp-input" placeholder="000 000" style="width:100%; padding:10px; text-align:center; letter-spacing:5px; font-size:18px; margin:20px 0; border-radius:6px; border:none;">
+                      <button data-action="check-otp" style="width:100%; padding:12px; background:#10b981; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Valider</button>
+                    </div>
+                  </div>
+                  `;
+                },
+                "bank-dash": () => {
+                  url.value = "https://neobank.secure/dashboard";
+                  return `
+                  <div class="full-size" style="background:#f8fafc; color:#333; display:flex; flex-direction:column;">
+                    <div style="background:white; padding:15px 30px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-weight:bold; color:#8b5cf6; font-size:20px;">NeoBank</span>
+                      <div style="display:flex; gap:15px; font-size:13px;">
+                        <span>Comptes</span>
+                        <span>Virements</span>
+                        <span style="font-weight:bold;">Documents</span>
+                      </div>
+                    </div>
+                    <div style="padding:40px; flex:1;">
+                      <h2 style="margin-top:0;">Bonjour, Julien</h2>
+                      <div style="display:flex; gap:20px; margin-top:30px;">
+                        <div style="flex:1; background:white; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                          <div style="color:#64748b; font-size:12px; text-transform:uppercase;">Compte Courant</div>
+                          <div style="font-size:28px; font-weight:bold; margin-top:5px;">2.450,00 €</div>
+                        </div>
+                        <div style="flex:1; background:white; padding:20px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                          <div style="color:#64748b; font-size:12px; text-transform:uppercase;">Livret A</div>
+                          <div style="font-size:28px; font-weight:bold; margin-top:5px;">150,00 €</div>
+                        </div>
+                        <div style="flex:1; background:#fef2f2; padding:20px; border-radius:8px; border:1px solid #fecaca;">
+                          <div style="color:#ef4444; font-size:12px; text-transform:uppercase;">Compte Offshore (Cayman)</div>
+                          <div style="font-size:28px; font-weight:bold; margin-top:5px; color:#b91c1c;">450.000,00 €</div>
+                          <button data-action="go" data-route="bank-transfer" style="margin-top:15px; width:100%; padding:8px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer;">EFFECTUER VIREMENT</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  `;
+                },
+                "bank-transfer": () => {
+                  url.value = "https://neobank.secure/transfer";
+                  return `
+                  <div class="full-size" style="background:#f8fafc; color:#333; display:flex; flex-direction:column;">
+                    <div style="background:white; padding:15px 30px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center;">
+                      <span style="font-weight:bold; color:#8b5cf6; font-size:20px; margin-right:20px;">NeoBank</span>
+                      <span style="font-size:14px; color:#64748b;">> Virement Externe</span>
+                    </div>
+                    <div style="padding:40px; display:flex; justify-content:center;">
+                      <div style="background:white; padding:30px; border-radius:8px; width:500px; box-shadow:0 2px 10px rgba(0,0,0,0.05);">
+                        <h3 style="margin-top:0;">Nouveau Virement</h3>
+                        <div style="margin-bottom:15px;">
+                          <label style="display:block; font-size:12px; color:#64748b; margin-bottom:5px;">Compte à débiter</label>
+                          <select style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:4px;"><option>Compte Offshore (450.000 €)</option></select>
+                        </div>
+                        <div style="margin-bottom:15px;">
+                          <label style="display:block; font-size:12px; color:#64748b; margin-bottom:5px;">IBAN Bénéficiaire</label>
+                          <input id="transfer-iban" placeholder="FR76 ..." style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:4px;">
+                        </div>
+                        <div style="margin-bottom:20px;">
+                          <label style="display:block; font-size:12px; color:#64748b; margin-bottom:5px;">Montant</label>
+                          <input id="transfer-amount" value="450000" readonly style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:4px; background:#f1f5f9;">
+                        </div>
+                        <button data-action="do-transfer" style="width:100%; padding:12px; background:#10b981; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">VALIDER LE VIREMENT</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  `;
+                }
+              };
+
+              if (routes[page]) view.innerHTML = routes[page]();
+            },
+            askOTP() {
+              const id = $("#bank-id").value;
+              if(id === TARGET.bankID) {
+                Apps.Browser.go('bank-otp');
+              } else {
+                Toast.show("Erreur", "Identifiant client inconnu.", "error");
+              }
+            },
+            checkOTP() {
+              const code = $("#otp-input").value;
+              if(code === TARGET.otpCode || code.replace(/\s/g, '') === TARGET.otpCode.replace(/\s/g, '')) {
+                Apps.Browser.go('bank-dash');
+              } else {
+                Toast.show("Erreur", "Code de sécurité invalide.", "error");
+              }
+            },
+            doTransfer() {
+              const iban = $("#transfer-iban").value.trim();
+              if(iban === TARGET.safeIBAN) {
+                OS.win();
+              } else {
+                Toast.show("Erreur", "IBAN bénéficiaire invalide ou non autorisé.", "error");
+              }
+            }
+          },
+
+          Terminal: {
+    history: [],
+    historyIndex: 0,
+    open() {
+      const html = `
+        <div class="app-term" id="term-app" onclick="document.getElementById('term-input').focus()">
+          <div class="term-line">OSINT-OS Terminal // Session Julien</div>
+          <div class="term-line">Tapez 'help' pour la liste des commandes.</div>
+          <div id="term-output"></div>
+          <div class="term-input-area">
+            <span class="term-prompt">$</span>
+            <input id="term-input" class="term-input" autocomplete="off" />
+          </div>
+        </div>
+      `;
+      WindowManager.create("term-main", "Terminal", html, 650, 420);
+      setTimeout(() => {
+        const input = document.getElementById("term-input");
+        if (input) {
+          input.focus();
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              const cmd = input.value;
+              Apps.Terminal.history.push(cmd);
+              Apps.Terminal.historyIndex = Apps.Terminal.history.length;
+              Apps.Terminal.print("$ " + cmd);
+              Apps.Terminal.handleCommand(cmd);
+              input.value = "";
+              // Scroll auto
+              const app = document.getElementById("term-app");
+              if(app) app.scrollTop = app.scrollHeight;
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              if (Apps.Terminal.history.length > 0) {
+                Apps.Terminal.historyIndex = Math.max(0, Apps.Terminal.historyIndex - 1);
+                input.value = Apps.Terminal.history[Apps.Terminal.historyIndex];
+              }
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              if (Apps.Terminal.historyIndex < Apps.Terminal.history.length) {
+                Apps.Terminal.historyIndex++;
+                input.value = Apps.Terminal.history[Apps.Terminal.historyIndex] || "";
+              }
+            }
+          });
+        }
+      }, 100);
+    },
+
+    print(line) {
+      const out = document.getElementById("term-output");
+      if (!out) return;
+      const div = document.createElement("div");
+      div.className = "term-line";
+      div.textContent = line;
+      out.appendChild(div);
+    },
+
+    handleCommand(raw) {
+      const cmd = raw.trim();
+      if (!cmd) return;
+
+      // Command Registry
+      const commands = {
+        help: () => this.print("Commandes : help, ls, cat [fichier], netscan, connect [ip], pass [mdp], sort [dossier], decrypt [fichier]"),
+        
+        netscan: () => {
+          this.print("Scan du réseau local en cours...");
+          this.print("192.168.1.1    [ROUTER]");
+          this.print("192.168.1.10   [WORKSTATION-JULIEN]");
+          this.print("192.168.1.55   [SECURE-NAS]");
+          STATE.flags.nasDiscovered = true;
+        },
+
+        sort: (args) => {
+          const target = args[0];
+          if (target === "Photos_Vacances") {
+            this.print("Analyse du dossier 'Photos_Vacances'...");
+            this.print("Tri par date en cours...");
+            setTimeout(() => {
+              this.print("Succès. Dossier 'Mariage_Trie' créé.");
+              STATE.flags.photos_sorted = true;
+              FILES.push({ id: "f_sorted", name: "Mariage_Trie", type: "folder" });
+              if(document.getElementById('win-explorer')) { WindowManager.close('explorer'); Apps.Explorer.open(); }
+            }, 1500);
+          } else {
+            this.print("Erreur : Dossier introuvable ou nom incorrect.");
+          }
+        },
+
+        connect: (args) => {
+          if (args[0] === "192.168.1.55") {
+            if (!STATE.flags.nasDiscovered) return this.print("Erreur : cible introuvable. Lancez d'abord 'netscan'.");
+            this.print("Connexion à 192.168.1.55...");
+            this.print("Mot de passe requis. Utilisez 'pass <motdepasse>'.");
+          } else {
+            this.print("Hôte inconnu.");
+          }
+        },
+
+        pass: (args) => {
+          const pwd = args.join(" ");
+          if (pwd === TARGET.nasPass) {
+            this.print("Authentification réussie. Accès NAS accordé.");
+            STATE.flags.nasConnected = true;
+          } else {
+            this.print("Mot de passe incorrect.");
+          }
+        },
+
+        ls: () => {
+          if (!STATE.flags.nasConnected) return this.print("Permission refusée. Connectez-vous d'abord.");
+          this.print("iban_secours.txt");
+          this.print("backups/");
+        },
+
+        cat: (args) => {
+          if (args[0] === "iban_secours.txt") {
+            if (!STATE.flags.nasConnected) return this.print("Permission refusée. Connectez-vous d'abord.");
+            this.print(TARGET.safeIBAN);
+            STATE.flags.ibanFound = true;
+          } else {
+            this.print("Fichier introuvable.");
+          }
+        },
+
+        decrypt: (args) => {
+          if (args[0] === "secure_notes.dat") {
+            this.print("Déchiffrement en cours...");
+            setTimeout(() => {
+              this.print("Succès. Contenu déchiffré :");
+              this.print(">> MÉMO : Le mot de passe de l'archive est une date importante. J'ai gardé une photo de ce jour-là.");
+            }, 1500);
+          } else {
+            this.print("Erreur : Fichier introuvable ou non chiffré.");
+          }
+        }
+      };
+
+      const [baseCmd, ...args] = cmd.split(" ");
+      if (commands[baseCmd]) {
+        commands[baseCmd](args);
+      } else {
+        this.print("Commande inconnue. Tapez 'help'.");
+      }
+    },
+  },
+        };
+
+        // -------------------------------------------------------
+        // OS CORE
+        // -------------------------------------------------------
+        const OS = {
+          async boot() {
+            const log = $("#boot-log");
+            const lines = [
+              "LOADING KERNEL v5.1...",
+              "MOUNTING VOLUMES... ENCRYPTED",
+              "BYPASSING SECURITY... SUCCESS",
+              "STARTING UI..."
+            ];
+            for (const line of lines) {
+              const div = document.createElement("div");
+              div.className = "boot-line";
+              div.textContent = "> " + line;
+              log.appendChild(div);
+              await sleep(400);
+            }
+            await sleep(500);
+            $("#boot-layer").classList.add("hidden");
+            $("#desktop").classList.remove("hidden");
+            OS.startTimer();
+            OS.initDesktop();
+            
+            // Event: Chat notification after 2 mins
+            setTimeout(() => {
+              Toast.show("Message", "Nouveau message de 'Sophie'", "info");
+            }, 120000);
+          },
+
+          triggerVirus() {
+             const overlay = $("#danger-overlay");
+             const txt = overlay.querySelector(".danger-text");
+             const msg = overlay.querySelector(".antivirus-msg");
+             
+             overlay.classList.remove("hidden");
+             overlay.classList.add("danger-active");
+             txt.style.display = "block";
+             
+             setTimeout(() => {
+               txt.style.display = "none";
+               msg.style.display = "block";
+               overlay.classList.remove("danger-active");
+             }, 3000);
+
+             setTimeout(() => {
+               overlay.classList.add("hidden");
+               msg.style.display = "none";
+               Toast.show("Antivirus", "Menace 'bitcoin_wallet.exe' supprimée.", "success");
+             }, 5500);
+          },
+
+          initDesktop() {
+            const icons = [
+              { name: "Fichiers", icon: "📂", action: "explorer" },
+              { name: "Mail", icon: "📧", action: "mail" },
+              { name: "SyncMobile", icon: "📱", action: "chat" },
+              { name: "Navigateur", icon: "🌐", action: "browser" },
+              { name: "Terminal", icon: "💻", action: "terminal" },
+              { name: "A Faire", icon: "📝", action: "note" },
+            ];
+
+            $("#icon-grid").innerHTML = icons.map(i => `
+              <div class="desktop-icon" data-action="launch" data-app="${i.action}">
+                <div class="di-img">${i.icon}</div>
+                <div class="di-label">${i.name}</div>
+              </div>
+            `).join('');
+
+            $("#dock").innerHTML = icons.map(i => `
+              <div class="dock-app" data-app="${i.action}" data-action="launch">${i.icon}</div>
+            `).join('');
+
+            setTimeout(() => $("#mission-hud").classList.add("active"), 1000);
+            Story.updateBrief();
+          },
+
+          startTimer() {
+            const timerEl = $("#game-timer");
+            STATE.flags.timerInterval = setInterval(() => {
+              STATE.flags.timeLeft--;
+              const m = Math.floor(STATE.flags.timeLeft / 60);
+              const s = STATE.flags.timeLeft % 60;
+              timerEl.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+              
+              if(STATE.flags.timeLeft <= 0) OS.gameOver();
+            }, 1000);
+            
+            setInterval(() => {
+              const now = new Date();
+              $("#clock").textContent = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+            }, 1000);
+          },
+
+          gameOver() {
+            clearInterval(STATE.flags.timerInterval);
+            $("#desktop").classList.add("hidden");
+            $("#end-screen").classList.remove("hidden");
+            $("#end-title").textContent = "ÉCHEC DE LA MISSION";
+            $("#end-title").style.color = "#ef4444";
+            $("#end-msg").textContent = "Le temps est écoulé. La connexion a été tracée et coupée par les services de sécurité.";
+          },
+
+          win() {
+            clearInterval(STATE.flags.timerInterval);
+            $("#desktop").classList.add("hidden");
+            $("#end-screen").classList.remove("hidden");
+            $("#end-title").textContent = "MISSION ACCOMPLIE";
+            $("#end-title").style.color = "#10b981";
+            $("#end-msg").textContent = "Virement effectué avec succès. Les fonds sont sécurisés.";
+
+            const nextBtn = $("#next-level-btn");
+            nextBtn.classList.remove("hidden");
+            // Pour votre niveau 1, vous changerez 'niveau_3.html' en 'niveau_2.html'
+            nextBtn.onclick = () => { window.location.href = 'niveau_3.html'; };
+          }
+        };
+
+        // -------------------------------------------------------
+        // GLOBAL HELPERS
+        // -------------------------------------------------------
+        const Toast = {
+          show(title, msg, type="info") {
+            const area = $("#toast-area");
+            const t = document.createElement("div");
+            t.className = "toast";
+            t.style.borderLeftColor = type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#8b5cf6';
+            t.innerHTML = `<strong>${escapeHtml(title)}</strong><br><span style="font-size:12px; opacity:0.8">${escapeHtml(msg)}</span>`;
+            area.appendChild(t);
+            setTimeout(() => t.remove(), 4000);
+          }
+        };
+
+        // Event Delegation for Hints
+        document.addEventListener("click", (e) => {
+          // Sécurisation de la cible
+          let target = e.target;
+          if (target.nodeType === 3) target = target.parentNode;
+          if (!target || !target.closest) return;
+
+          // 1. Toggle Hints
+          const toggle = target.closest("#btn-toggle-hints");
+          if(toggle) {
+            $("#mission-brief").classList.toggle("hidden");
+            $("#hint-selector").classList.toggle("hidden");
+            return;
+          }
+
+          // 2. Actions
+          const actionEl = target.closest("[data-action]");
+          if (!actionEl) return;
+
+          const action = actionEl.dataset.action;
+          const handlers = {
+            'launch': () => Apps.launch(actionEl.dataset.app),
+            'get-hint': () => Story.showHint(actionEl.dataset.level),
+            'open-file': () => Apps.Explorer.handle(actionEl.dataset.id),
+            'open-mail': () => Apps.Mail.view(actionEl.dataset.id),
+            'unlock-chat': () => Apps.Chat.unlock(),
+            'open-chat-contact': () => Apps.Chat.load(actionEl.dataset.id),
+            'go': () => Apps.Browser.go(actionEl.dataset.route),
+            'check-bank-login': () => Apps.Browser.askOTP(),
+            'check-otp': () => Apps.Browser.checkOTP(),
+            'do-transfer': () => Apps.Browser.doTransfer(),
+            'scan-metadata': () => {
+              const btn = actionEl;
+              const targetId = btn.dataset.targetId;
+              const metadata = btn.dataset.metadata;
+              const metaContainer = $(`#scan-results-${targetId}`);
+
+              if (!metaContainer) return;
+
+              btn.textContent = "SCAN EN COURS...";
+              btn.disabled = true;
+
+              setTimeout(() => {
+                  const newContent = metadata.split('\n').map(line => {
+                      const [label, ...value] = line.split(':');
+                      const isDate = label.toLowerCase().includes('date');
+                      const valueStr = value.join(':').trim();
+                      return `
+                          <div class="p-meta-row">
+                              <span class="p-meta-lbl" style="color:#888;">${escapeHtml(label)}</span>
+                              <span style="${isDate ? 'color:#fbbf24; font-weight:bold;' : 'color:#fff;'}">${escapeHtml(valueStr)}</span>
+                          </div>`;
+                  }).join('');
+
+                  metaContainer.innerHTML = newContent;
+                  metaContainer.style.display = "block";
+                  metaContainer.scrollIntoView({ behavior: "smooth" });
+                  btn.textContent = "SCAN TERMINÉ";
+              }, 1500);
+            }
+          };
+
+          if (handlers[action]) handlers[action]();
+        });
+
+        // Init
+        document.addEventListener("DOMContentLoaded", OS.boot);
+
+      })();
+    </script>
+  </body>
+</html>
